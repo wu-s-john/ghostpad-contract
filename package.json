@@ -1,0 +1,44 @@
+{
+    "name": "ghostpad",
+    "version": "1.0.0",
+    "description": "Anonymous Token Launching Platform",
+    "main": "truffle-config.js",
+    "directories": {
+      "test": "test"
+    },
+    "scripts": {
+      "test": "forge test",
+      "compile": "forge build",
+      "deploy": "forge script",
+      "coverage": "forge coverage",
+      "anvil": "anvil",
+      "format": "forge fmt",
+      "gas-report": "forge test --gas-report"
+    },
+    "keywords": [
+      "ethereum",
+      "tornado",
+      "zksnark",
+      "privacy",
+      "token",
+      "memecoin"
+    ],
+    "author": "GhostPad Team",
+    "license": "MIT",
+    "dependencies": {
+      "@openzeppelin/contracts": "^3.4.0"
+    },
+    "devDependencies": {
+      "@openzeppelin/test-helpers": "^0.5.16",
+      "@truffle/hdwallet-provider": "^2.1.15",
+      "chai": "^4.3.7",
+      "circomlib": "^0.5.5",
+      "dotenv": "^16.0.3",
+      "ethers": "^5.7.2",
+      "hardhat": "^2.22.19",
+      "solidity-coverage": "^0.8.2",
+      "truffle": "^5.7.9",
+      "truffle-plugin-verify": "^0.6.2"
+    }
+  }
+  
