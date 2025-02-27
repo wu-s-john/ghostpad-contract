@@ -13,6 +13,12 @@ interface ITornadoInstance {
     function denomination() external view returns (uint256);
     
     /**
+     * @dev Deposit into the Tornado instance
+     * @param commitment The commitment hash
+     */
+    function deposit(bytes32 commitment) external payable;
+    
+    /**
      * @dev Withdraw from the Tornado instance
      * @param proof The ZK proof
      * @param root The Merkle root
@@ -37,4 +43,11 @@ interface ITornadoInstance {
      * @return The last Merkle root
      */
     function getLastRoot() external view returns (bytes32);
+    
+    /**
+     * @dev Check if a nullifier hash has been spent
+     * @param nullifierHash The nullifier hash to check
+     * @return Whether the nullifier has been spent
+     */
+    function isSpent(bytes32 nullifierHash) external view returns (bool);
 } 
