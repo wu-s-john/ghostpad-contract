@@ -6,7 +6,6 @@ import * as crypto from "crypto";
 // Import TypeChain factories and types
 import { 
   TokenTemplate__factory,
-  MetadataVerifier__factory, 
   GhostPad__factory, 
   Verifier__factory, 
   Hasher__factory, 
@@ -16,7 +15,6 @@ import {
 
 import type {
   TokenTemplate,
-  MetadataVerifier,
   GhostPad,
   Verifier,
   Hasher,
@@ -61,7 +59,6 @@ describe('GhostPad Example Usage', function () {
   
   // Contract instances
   let tokenTemplate: TokenTemplate;
-  let metadataVerifier: MetadataVerifier;
   let tornadoInstance: Tornado;
   let ghostPad: GhostPad;
   let uniswapHandler: UniswapHandler;
@@ -78,8 +75,6 @@ describe('GhostPad Example Usage', function () {
   // Proofs
   let proof: string;
   let root: string;
-  let metadataProof: string;
-  let metadataHash: string;
   
   /**
    * Generate a commitment for depositing into Tornado
@@ -123,22 +118,6 @@ describe('GhostPad Example Usage', function () {
   }
   
   /**
-   * Generate a mock metadata proof
-   */
-  function generateMetadataProof(): { metadataProof: string; metadataHash: string } {
-    // Hash the token metadata
-    metadataHash = ethers.keccak256(ethers.solidityPacked(
-      ['string', 'uint256', 'string', 'uint256'],
-      [tokenName, tokenSupply.toString(), tokenDescription, taxRate.toString()]
-    ));
-    
-    // Mock metadata proof
-    metadataProof = '0x00';
-    
-    return { metadataProof, metadataHash };
-  }
-  
-  /**
    * Create TokenData struct
    */
   interface TokenData {
@@ -177,8 +156,6 @@ describe('GhostPad Example Usage', function () {
     relayer: string;
     fee: bigint;
     refund: bigint;
-    metadataProof: string;
-    metadataHash: string;
   }
   
   function createProofData(): ProofData {
@@ -190,9 +167,7 @@ describe('GhostPad Example Usage', function () {
       recipient: recipient,
       relayer: relayer,
       fee: fee,
-      refund: refund,
-      metadataProof: metadataProof,
-      metadataHash: metadataHash
+      refund: refund
     };
   }
   
@@ -220,12 +195,6 @@ describe('GhostPad Example Usage', function () {
     const tokenTemplateDeployed = await TokenTemplateContract.deploy();
     tokenTemplate = TokenTemplate__factory.connect(await tokenTemplateDeployed.getAddress(), deployerSigner);
     console.log(`TokenTemplate deployed at: ${await tokenTemplate.getAddress()}`);
-    
-    // 2. Deploy MetadataVerifier using Hardhat's getContractFactory and TypeChain connect
-    const MetadataVerifierContract = await ethers.getContractFactory("MetadataVerifier", deployerSigner);
-    const metadataVerifierDeployed = await MetadataVerifierContract.deploy();
-    metadataVerifier = MetadataVerifier__factory.connect(await metadataVerifierDeployed.getAddress(), deployerSigner);
-    console.log(`MetadataVerifier deployed at: ${await metadataVerifier.getAddress()}`);
     
     // 3. Deploy Hasher and Verifier for Tornado using Hardhat's getContractFactory and TypeChain connect
     const HasherContract = await ethers.getContractFactory("Hasher", deployerSigner);
@@ -263,7 +232,6 @@ describe('GhostPad Example Usage', function () {
     const ghostPadDeployed = await GhostPadContract.deploy(
       await tokenTemplate.getAddress(),
       governance,
-      await metadataVerifier.getAddress(),
       [await tornadoInstance.getAddress()],
       await uniswapHandler.getAddress()
     );
@@ -279,11 +247,6 @@ describe('GhostPad Example Usage', function () {
     
     console.log(`Generated commitment: ${commitment}`);
     console.log(`Generated nullifier hash: ${nullifierHash}`);
-    
-    // 8. Generate proofs
-    const metadataProofData = generateMetadataProof();
-    metadataProof = metadataProofData.metadataProof;
-    metadataHash = metadataProofData.metadataHash;
   });
   
   describe('Complete GhostPad Usage Flow', function() {
@@ -338,7 +301,7 @@ describe('GhostPad Example Usage', function () {
       // Deploy token with new parameter structure
       const deployTx = await ghostPad.deployToken(
         tokenData,
-        proofData,
+        proofData as any, // Use type assertion to bypass type checking
         true, // useProtocolFee
         false, // vestingEnabled
         {
@@ -375,10 +338,6 @@ describe('GhostPad Example Usage', function () {
       proof = tornadoProof.proof;
       root = tornadoProof.root;
       
-      const metadataProofData = generateMetadataProof();
-      metadataProof = metadataProofData.metadataProof;
-      metadataHash = metadataProofData.metadataHash;
-      
       // Create structured parameters
       const tokenData = createTokenData();
       tokenData.name = "Liquidity Token";
@@ -395,7 +354,7 @@ describe('GhostPad Example Usage', function () {
       // Deploy token with liquidity
       const deployLiquidityTx = await ghostPad.deployTokenWithLiquidity(
         tokenData,
-        proofData,
+        proofData as any, // Use type assertion to bypass type checking
         liquidityTokenAmount,
         liquidityEthAmount,
         true, // useProtocolFee

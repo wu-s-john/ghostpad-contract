@@ -1,5 +1,5 @@
-import { ethers } from "hardhat";
 import { expect, describe, it, beforeAll, beforeEach } from "vitest";
+import { ethers } from "ethers";
 
 // Import TypeChain factories and types
 import { 
@@ -33,16 +33,24 @@ describe('TokenTemplate', function () {
   const vestingEnabled = false;
   
   beforeAll(async function () {
-    // Get accounts
-    accounts = await ethers.getSigners().then(signers => signers.map(signer => signer.address));
+    // Get accounts from global signers
+    const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+    const signers = await Promise.all(Array(4).fill(0).map(async (_, i) => {
+      const wallet = ethers.Wallet.createRandom().connect(provider);
+      // Fund the wallet to perform transactions
+      await provider.send("hardhat_setBalance", [
+        await wallet.getAddress(),
+        "0x1000000000000000000000000000000", // Large balance
+      ]);
+      return wallet;
+    }));
+    
+    accounts = await Promise.all(signers.map(signer => signer.getAddress()));
     [deployer, owner, user1, user2] = accounts;
     taxRecipient = owner; // Set tax recipient to owner
     
-    // Get deployer signer
-    const deployerSigner = await ethers.getSigner(deployer);
-    
     // Deploy the TokenTemplate contract using TypeChain factory
-    const tokenTemplateFactory = new TokenTemplate__factory(deployerSigner);
+    const tokenTemplateFactory = new TokenTemplate__factory(signers[0]);
     tokenTemplate = await tokenTemplateFactory.deploy();
   });
   
@@ -53,7 +61,8 @@ describe('TokenTemplate', function () {
     });
     
     it('should initialize correctly', async function () {
-      const deployerSigner = await ethers.getSigner(deployer);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const deployerSigner = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Initialize the token
       await tokenTemplate.initialize(
@@ -128,10 +137,11 @@ describe('TokenTemplate', function () {
     
     it('should allow transfers', async function () {
       const amount = ethers.parseEther('1000');
-      const deployerSigner = await ethers.getSigner(deployer);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const deployerWallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Transfer tokens from deployer to user1
-      await tokenTemplate.connect(deployerSigner).transfer(user1, amount);
+      await tokenTemplate.transfer(user1, amount);
       
       // Check balances
       expect(await tokenTemplate.balanceOf(user1)).toBe(amount);
@@ -141,10 +151,11 @@ describe('TokenTemplate', function () {
     it('should allow owner to mint new tokens', async function () {
       const mintAmount = ethers.parseEther('5000');
       const initialTotal = await tokenTemplate.totalSupply();
-      const ownerSigner = await ethers.getSigner(owner);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const ownerWallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Mint tokens to user2
-      await tokenTemplate.connect(ownerSigner).mint(user2, mintAmount);
+      await tokenTemplate.mint(user2, mintAmount);
       
       // Check balance and total supply
       expect(await tokenTemplate.balanceOf(user2)).toBe(mintAmount);
@@ -153,24 +164,26 @@ describe('TokenTemplate', function () {
     
     it('should prevent non-owner from minting', async function () {
       const mintAmount = ethers.parseEther('1000');
-      const user1Signer = await ethers.getSigner(user1);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const user1Wallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Try to mint tokens as non-owner, should fail
       await expect(
-        tokenTemplate.connect(user1Signer).mint(user1, mintAmount)
+        tokenTemplate.connect(user1Wallet).mint(user1, mintAmount)
       ).rejects.toThrow("Ownable: caller is not the owner");
     });
     
     it('should allow users to burn their tokens when burning is enabled', async function () {
       const burnAmount = ethers.parseEther('500');
-      const user1Signer = await ethers.getSigner(user1);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const user1Wallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Get initial balances
       const initialBalance = await tokenTemplate.balanceOf(user1);
       const initialTotal = await tokenTemplate.totalSupply();
       
       // Burn tokens
-      await tokenTemplate.connect(user1Signer).burn(burnAmount);
+      await tokenTemplate.connect(user1Wallet).burn(burnAmount);
       
       // Check balances
       expect(await tokenTemplate.balanceOf(user1)).toBe(initialBalance - burnAmount);
@@ -182,7 +195,8 @@ describe('TokenTemplate', function () {
       const expectedTaxAmount = (transferAmount * BigInt(taxRate)) / BigInt(10000);
       const expectedReceivedAmount = transferAmount - expectedTaxAmount;
       
-      const user2Signer = await ethers.getSigner(user2);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const user2Wallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Get initial balances
       const initialUser1Balance = await tokenTemplate.balanceOf(user1);
@@ -190,7 +204,7 @@ describe('TokenTemplate', function () {
       const initialTaxRecipientBalance = await tokenTemplate.balanceOf(taxRecipient);
       
       // Perform transfer
-      await tokenTemplate.connect(user2Signer).transfer(user1, transferAmount);
+      await tokenTemplate.connect(user2Wallet).transfer(user1, transferAmount);
       
       // Verify balances after transfer
       const user1Balance = await tokenTemplate.balanceOf(user1);
@@ -215,11 +229,12 @@ describe('TokenTemplate', function () {
     
     it('should handle allowances correctly', async function () {
       const approvalAmount = ethers.parseEther('100');
-      const user1Signer = await ethers.getSigner(user1);
-      const user2Signer = await ethers.getSigner(user2);
+      const provider = new ethers.JsonRpcProvider('http://localhost:8545');
+      const user1Wallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
+      const user2Wallet = new ethers.Wallet(ethers.Wallet.createRandom().privateKey, provider);
       
       // Approve user2 to spend user1's tokens
-      await tokenTemplate.connect(user1Signer).approve(user2, approvalAmount);
+      await tokenTemplate.connect(user1Wallet).approve(user2, approvalAmount);
       
       // Check allowance
       expect(await tokenTemplate.allowance(user1, user2)).toBe(approvalAmount);
@@ -230,7 +245,7 @@ describe('TokenTemplate', function () {
       const initialReceiverBalance = await tokenTemplate.balanceOf(deployer);
       
       // User2 transfers user1's tokens to deployer
-      await tokenTemplate.connect(user2Signer).transferFrom(user1, deployer, transferAmount);
+      await tokenTemplate.connect(user2Wallet).transferFrom(user1, deployer, transferAmount);
       
       // Check balances
       expect(await tokenTemplate.balanceOf(user1)).toBe(initialSenderBalance - transferAmount);

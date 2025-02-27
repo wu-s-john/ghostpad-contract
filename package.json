@@ -3,29 +3,27 @@
   "version": "1.0.0",
   "description": "Anonymous Token Launching Platform",
   "main": "truffle-config.js",
+  "engines": {
+    "node": ">=16.15.1"
+  },
   "directories": {
     "test": "test"
   },
   "scripts": {
     "test": "forge test",
-    "test:hardhat": "hardhat test",
-    "test:vitest": "vitest run",
-    "test:watch": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage",
+    "test:vitest": "NODE_OPTIONS=--experimental-vm-modules vitest run",
+    "test:watch": "NODE_OPTIONS=--experimental-vm-modules vitest",
+    "test:ui": "NODE_OPTIONS=--experimental-vm-modules vitest --ui",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules vitest run --coverage",
     "compile": "forge build && yarn generate-all-types",
-    "compile:hardhat": "hardhat compile",
     "deploy": "forge script",
     "coverage": "forge coverage",
-    "coverage:hardhat": "hardhat coverage",
     "anvil": "anvil",
     "format": "forge fmt",
     "gas-report": "forge test --gas-report",
     "typechain": "typechain --target ethers-v5 --out-dir typechain 'out/GhostPad.sol/GhostPad.json' 'out/TokenTemplate.sol/TokenTemplate.json' 'out/Tornado.sol/Tornado.json' 'out/UniswapHandler.sol/UniswapHandler.json' 'out/Hasher.sol/Hasher.json' 'out/MetadataVerifier.sol/MetadataVerifier.json' 'out/Verifier.sol/Verifier.json' 'out/MerkleTreeWithHistoryMock.sol/MerkleTreeWithHistoryMock.json'",
-    "clean": "hardhat clean",
     "setup-type-dirs": "node scripts/setup-type-dirs.js",
-    "generate-all-types": "yarn setup-type-dirs && yarn typechain",
-    "hardhat-types": "hardhat typechain"
+    "generate-all-types": "yarn setup-type-dirs && yarn typechain"
   },
   "keywords": [
     "ethereum",
@@ -42,16 +40,10 @@
     "ethers": "^6.13.5"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
-    "@nomicfoundation/hardhat-ethers": "^3.0.8",
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
-    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.0",
     "@openzeppelin/test-helpers": "^0.5.16",
     "@truffle/hdwallet-provider": "^2.1.15",
     "@typechain/ethers-v5": "^11.1.2",
     "@typechain/ethers-v6": "^0.5.0",
-    "@typechain/hardhat": "^9.0.0",
     "@types/chai": "^4.3.6",
     "@types/mocha": "^10.0.1",
     "@types/node": "^20.5.7",
@@ -62,8 +54,6 @@
     "circomlib": "^0.5.5",
     "dotenv": "^16.0.3",
     "ethereum-abi-types-generator": "^1.3.4",
-    "hardhat": "^2.22.19",
-    "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.2",
     "truffle": "^5.7.9",
     "truffle-plugin-verify": "^0.6.2",

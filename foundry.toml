@@ -10,7 +10,6 @@ remappings = [
     "@ganache/=node_modules/@ganache/",
     "@openzeppelin/=node_modules/@openzeppelin/",
     "@truffle/=node_modules/@truffle/",
-    "hardhat/=node_modules/hardhat/",
     "truffle/=node_modules/truffle/",
     "forge-std/=lib/forge-std/src/"
 ]

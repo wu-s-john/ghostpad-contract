@@ -20,7 +20,6 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/ITornadoInstance.sol";
-import "./interfaces/IMetadataVerifier.sol";
 import "./TokenTemplate.sol";
 import "./UniswapHandler.sol";
 
@@ -37,6 +36,8 @@ interface ITokenTemplate {
         uint256 liquidityLockPeriod,
         bool vestingEnabled
     ) external;
+
+    function calculateOwnerPercentage(uint256 ethAmount) external pure returns (uint256);
 }
 
 /**
@@ -53,9 +54,6 @@ contract GhostPad is Ownable {
     // Address that receives fees and has special privileges
     address public governance;
     
-    // Address of the verifier for metadata proofs
-    address public metadataVerifier;
-
     // Address of the Uniswap handler contract
     address public uniswapHandler;
     
@@ -81,7 +79,6 @@ contract GhostPad is Ownable {
     // Events
     event TokenDeployed(bytes32 indexed nullifierHash, address tokenAddress, string name, string symbol);
     event GovernanceUpdated(address indexed oldGovernance, address indexed newGovernance);
-    event MetadataVerifierUpdated(address indexed oldVerifier, address indexed newVerifier);
     event UniswapHandlerUpdated(address indexed oldHandler, address indexed newHandler);
     event LiquidityPoolCreated(address indexed tokenAddress, address indexed pairAddress, uint256 liquidityAdded);
     event GovernanceFeeUpdated(uint32 oldFee, uint32 newFee);
@@ -90,25 +87,22 @@ contract GhostPad is Ownable {
      * @dev Constructor
      * @param _tokenTemplate Address of the token template
      * @param _governance Address that will receive fees
-     * @param _metadataVerifier Address of the metadata verifier
      * @param _tornadoInstances Array of tornado instance addresses
      * @param _uniswapHandler Address of the Uniswap handler contract
      */
     constructor(
         address _tokenTemplate,
         address _governance,
-        address _metadataVerifier,
         address[] memory _tornadoInstances,
         address _uniswapHandler
     ) {
         require(_tokenTemplate != address(0), "Invalid token template address");
         require(_governance != address(0), "Invalid governance address");
-        require(_metadataVerifier != address(0), "Invalid metadata verifier address");
         require(_tornadoInstances.length > 0, "No tornado instances provided");
+        require(_uniswapHandler != address(0), "Invalid Uniswap handler address");
         
         tokenTemplate = _tokenTemplate;
         governance = _governance;
-        metadataVerifier = _metadataVerifier;
         uniswapHandler = _uniswapHandler;
         
         // Add Tornado instances
@@ -125,27 +119,36 @@ contract GhostPad is Ownable {
     }
     
     /**
+     * @dev Receive function to accept ETH transfers
+     * This is needed for receiving ETH from Tornado instances and other operations
+     */
+    receive() external payable {
+        // Simply accept ETH
+    }
+    
+    /**
+     * @dev Fallback function to accept ETH transfers
+     * This provides backward compatibility for older contracts that don't use receive()
+     */
+    fallback() external payable {
+        // Simply accept ETH
+    }
+    
+    /**
      * @dev Deploy a new token using a tornado withdrawal proof
      * @param tokenData Struct containing token metadata and parameters
      * @param proofData Struct containing tornado proof data
-     * @param useProtocolFee Whether to apply the protocol fee (if false, fee is 0%)
-     * @param vestingEnabled Whether to enable vesting functionality
      */
     function deployToken(
         TokenData memory tokenData,
-        ProofData memory proofData,
-        bool useProtocolFee,
-        bool vestingEnabled
+        ProofData memory proofData
     ) external returns (address) {
         // Process the tornado proof
         _processTornadoProof(proofData);
         
-        // Verify metadata
-        _verifyMetadata(proofData);
-        
         // Deploy and initialize the token
-        uint256 fee = useProtocolFee ? governanceFee : 0;
-        address tokenAddress = _deployAndInitializeToken(tokenData, proofData, fee, vestingEnabled);
+        uint256 fee = tokenData.useProtocolFee ? governanceFee : 0;
+        address tokenAddress = _deployAndInitializeToken(tokenData, proofData, fee);
         
         // Update state
         deployedTokens[proofData.nullifierHash] = tokenAddress;
@@ -165,11 +168,12 @@ contract GhostPad is Ownable {
         TornadoInstanceInfo memory instanceInfo = tornadoInstances[proofData.instanceIndex];
         ITornadoInstance tornadoInstance = ITornadoInstance(instanceInfo.instance);
         
+        // Perform the Tornado withdrawal
         tornadoInstance.withdraw{value: proofData.refund}(
             proofData.proof,
             proofData.root,
             proofData.nullifierHash,
-            proofData.recipient,
+            proofData.recipient, // This should be the contract address for liquidity
             proofData.relayer,
             proofData.fee,
             proofData.refund
@@ -177,30 +181,16 @@ contract GhostPad is Ownable {
     }
     
     /**
-     * @dev Verify metadata
-     * @param proofData Struct containing tornado proof data
-     */
-    function _verifyMetadata(ProofData memory proofData) private {
-        uint256[2] memory input;
-        input[0] = uint256(proofData.nullifierHash);
-        input[1] = uint256(proofData.metadataHash);
-        
-        require(IMetadataVerifier(metadataVerifier).verifyProof(proofData.metadataProof, input), "Invalid metadata proof");
-    }
-    
-    /**
      * @dev Deploy and initialize a new token
      * @param tokenData Struct containing token metadata and parameters
      * @param proofData Struct containing tornado proof data
      * @param fee Protocol fee in basis points
-     * @param vestingEnabled Whether vesting is enabled
      * @return tokenAddress Address of the deployed token
      */
     function _deployAndInitializeToken(
         TokenData memory tokenData,
         ProofData memory proofData,
-        uint256 fee,
-        bool vestingEnabled
+        uint256 fee
     ) private returns (address tokenAddress) {
         // Deploy a new token using the clone factory
         tokenAddress = Clones.clone(tokenTemplate);
@@ -217,7 +207,7 @@ contract GhostPad is Ownable {
             tokenData.taxRecipient,
             tokenData.burnEnabled,
             tokenData.liquidityLockPeriod,
-            vestingEnabled
+            tokenData.vestingEnabled
         );
         
         // Transfer fee if applicable
@@ -233,32 +223,34 @@ contract GhostPad is Ownable {
      * @dev Deploy a new token with Uniswap liquidity using a tornado withdrawal proof
      * @param tokenData Struct containing token metadata and parameters
      * @param proofData Struct containing tornado proof data
-     * @param liquidityTokenAmount Amount of tokens to add to liquidity
-     * @param liquidityEthAmount Amount of ETH to add to liquidity
-     * @param useProtocolFee Whether to apply the protocol fee (if false, fee is 0%)
-     * @param vestingEnabled Whether to enable vesting functionality
      */
     function deployTokenWithLiquidity(
         TokenData memory tokenData,
-        ProofData memory proofData,
-        uint256 liquidityTokenAmount,
-        uint256 liquidityEthAmount,
-        bool useProtocolFee,
-        bool vestingEnabled
+        ProofData memory proofData
     ) external payable returns (address tokenAddress) {
-        require(uniswapHandler != address(0), "Uniswap handler not set");
-        require(msg.value >= liquidityEthAmount + proofData.refund, "Insufficient ETH sent");
+        require(proofData.instanceIndex < tornadoInstances.length, "Instance index out of bounds");
+        require(tokenData.liquidityTokenAmount > 0, "Liquidity token amount must be greater than 0");
+        
+        // Make sure the recipient is this contract so it receives the ETH from Tornado
+        proofData.recipient = payable(address(this));
+        // Add an assertion to ensure recipient is correctly set
+        require(proofData.recipient == payable(address(this)), "Recipient must be this contract");
+        
+        // Get the instance information to know the ETH amount
+        TornadoInstanceInfo memory instanceInfo = tornadoInstances[proofData.instanceIndex];
+        uint256 liquidityEthAmount = instanceInfo.denomination;
+        
+        // Make sure enough ETH was sent for the refund
+        require(msg.value >= proofData.refund, "Insufficient ETH sent for refund");
         
         // Deploy the token first
         tokenAddress = this.deployToken(
             tokenData,
-            proofData,
-            useProtocolFee,
-            vestingEnabled
+            proofData
         );
         
-        // Add liquidity if requested
-        _addLiquidity(tokenAddress, liquidityTokenAmount, liquidityEthAmount);
+        // Add liquidity using the ETH received from Tornado
+        _addLiquidity(tokenAddress, tokenData.liquidityTokenAmount, liquidityEthAmount);
         
         return tokenAddress;
     }
@@ -333,19 +325,6 @@ contract GhostPad is Ownable {
     }
     
     /**
-     * @dev Update the metadata verifier address (only callable by owner)
-     * @param _newVerifier New verifier address
-     */
-    function updateMetadataVerifier(address _newVerifier) external onlyOwner {
-        require(_newVerifier != address(0), "Invalid metadata verifier address");
-        
-        address oldVerifier = metadataVerifier;
-        metadataVerifier = _newVerifier;
-        
-        emit MetadataVerifierUpdated(oldVerifier, _newVerifier);
-    }
-    
-    /**
      * @dev Update the Uniswap handler address (only callable by owner)
      * @param _newHandler New Uniswap handler address
      */
@@ -407,6 +386,9 @@ contract GhostPad is Ownable {
         address taxRecipient;
         bool burnEnabled;
         uint256 liquidityLockPeriod;
+        uint256 liquidityTokenAmount;
+        bool useProtocolFee;
+        bool vestingEnabled;
     }
     
     struct ProofData {
@@ -418,7 +400,5 @@ contract GhostPad is Ownable {
         address payable relayer;
         uint256 fee;
         uint256 refund;
-        bytes metadataProof;
-        bytes32 metadataHash;
     }
 } 

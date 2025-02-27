@@ -6,7 +6,6 @@ import "../src/GhostPad.sol";
 import "../src/TokenTemplate.sol";
 import "../src/UniswapHandler.sol";
 import "../src/Verifier.sol";
-import "../src/MetadataVerifier.sol";
 
 contract DeployScript is Script {
     function setUp() public {}
@@ -17,7 +16,6 @@ contract DeployScript is Script {
 
         // Deploy Verifiers
         Verifier verifier = new Verifier();
-        MetadataVerifier metadataVerifier = new MetadataVerifier();
         
         // Deploy TokenTemplate and UniswapHandler
         TokenTemplate tokenTemplate = new TokenTemplate();
@@ -35,7 +33,6 @@ contract DeployScript is Script {
         GhostPad ghostPad = new GhostPad(
             address(tokenTemplate),
             payable(msg.sender), // governance address
-            address(metadataVerifier),
             tornadoInstances,
             address(uniswapHandler)
         );

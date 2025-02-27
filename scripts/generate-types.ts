@@ -21,13 +21,13 @@ async function generateTypes() {
   }
   
   try {
-    // Compile contracts if needed
-    console.log('Compiling contracts...');
-    await execPromise('npx hardhat compile');
+    // Compile contracts using forge
+    console.log('Compiling contracts with forge...');
+    await execPromise('forge build');
     
-    // Generate types
+    // Generate typechain types directly
     console.log('Running TypeChain...');
-    await execPromise('npx hardhat typechain');
+    await execPromise('npx typechain --target ethers-v6 --out-dir types/contracts "out/**/*.json"');
     
     console.log('TypeChain types generated successfully!');
   } catch (error) {

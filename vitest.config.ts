@@ -6,7 +6,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts'],
-    setupFiles: ['./test/setup.ts'],
+    setupFiles: ['./test/setup.esm.ts'],
   },
   resolve: {
     alias: {
@@ -14,6 +14,8 @@ export default defineConfig({
       '@src': resolve(__dirname, './src'),
       '@test': resolve(__dirname, './test'),
       '@types': resolve(__dirname, './types'),
+      '@typechain': resolve(__dirname, './typechain'),
+      'typechain': resolve(__dirname, './typechain'),
     },
-  },
+  }
 }); 

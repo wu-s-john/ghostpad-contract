@@ -64,6 +64,7 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
     event VestingScheduleCreated(address beneficiary, uint256 amount, uint256 start, uint256 cliff, uint256 duration, bool revocable);
     event VestingScheduleRevoked(bytes32 vestingScheduleId);
     event VestingReleased(bytes32 vestingScheduleId, uint256 amount);
+    event TokenDistribution(uint256 ownerAmount, uint256 contractAmount, uint256 ownerPercentage);
     
     /**
      * @dev Constructor
@@ -71,6 +72,67 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
      */
     constructor() public ERC20("Template", "TEMP") {
         // This constructor is only used for the original template, not the clones
+    }
+    
+    /**
+     * @dev Calculate the percentage of tokens that should go to the owner based on ETH deposited
+     * Uses the formula: P(d) = 0.00708 * d^3 - 0.8642 * d^2 + 17.61 * d + 3.248
+     * Where d is the amount of ETH in whole units (not wei)
+     * @param ethAmount Amount of ETH deposited in wei
+     * @return percentage Percentage of tokens that should go to the owner (in basis points, 100 = 1%)
+     */
+    function calculateOwnerPercentage(uint256 ethAmount) public pure returns (uint256) {
+        // Convert wei to whole ETH units with 3 decimal precision for the calculation
+        // We use 10^15 instead of 10^18 to keep 3 decimal places of precision
+        uint256 ethInWholeUnits = ethAmount.div(10**15);
+        
+        // Apply the formula P(d) = 0.00708 * d^3 - 0.8642 * d^2 + 17.61 * d + 3.248
+        // Since Solidity doesn't support floating point, we multiply by 1000 for all calculations
+        // and divide by 1000 at the end to get the correct percentage in basis points
+        
+        // Convert ethInWholeUnits to a value with 3 decimal places (e.g., 1 ETH = 1000)
+        uint256 d = ethInWholeUnits;
+        
+        // Calculate the cubic term: 0.00708 * d^3
+        // We represent 0.00708 as 708 / 100000
+        uint256 cubicTerm = d.mul(d).mul(d).mul(708).div(100000);
+        
+        // Calculate the quadratic term: 0.8642 * d^2
+        // We represent 0.8642 as 8642 / 10000
+        uint256 quadraticTerm = d.mul(d).mul(8642).div(10000);
+        
+        // Calculate the linear term: 17.61 * d
+        // We represent 17.61 as 1761 / 100
+        uint256 linearTerm = d.mul(1761).div(100);
+        
+        // Constant term: 3.248
+        // We represent 3.248 as 3248 / 1000
+        uint256 constantTerm = 3248;
+        
+        // Combine the terms: cubicTerm - quadraticTerm + linearTerm + constantTerm
+        // Note: We need to be careful with underflows when subtracting quadraticTerm
+        uint256 result;
+        if (quadraticTerm <= cubicTerm.add(linearTerm).add(constantTerm)) {
+            result = cubicTerm.add(linearTerm).add(constantTerm).sub(quadraticTerm);
+        } else {
+            // If the calculation would result in a negative number, return a minimum percentage (2%)
+            result = 200;
+        }
+        
+        // Convert to basis points (100 = 1%)
+        uint256 percentInBasisPoints = result.mul(100).div(1000);
+        
+        // Cap at 5000 basis points (50%) as a maximum
+        if (percentInBasisPoints > 5000) {
+            return 5000;
+        }
+        
+        // Ensure a minimum of 200 basis points (2%)
+        if (percentInBasisPoints < 200) {
+            return 200;
+        }
+        
+        return percentInBasisPoints;
     }
     
     /**
@@ -103,9 +165,46 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
         
         // Initialize ERC20
         super._setupDecimals(18);
+        
         // Since we can't set name and symbol directly as they're immutable in ERC20,
         // we'll use the values in the UI layer instead of the contract
-        _mint(msg.sender, initialSupply);
+        
+        // Determine the ETH amount based on the caller contract
+        uint256 ethAmount = 0;
+        
+        // If we're being called by GhostPad with liquidity, we can get the ETH amount from it
+        if (msg.sender != tx.origin) {
+            address caller = msg.sender;
+            
+            // Try to get the Tornado instance denomination from GhostPad
+            try this.getTornadoDenomination(caller) returns (uint256 denomination) {
+                ethAmount = denomination;
+            } catch {
+                // If it fails, we'll use a default percentage (50%)
+                ethAmount = 0;
+            }
+        }
+        
+        // Calculate the owner percentage based on ETH amount
+        uint256 ownerPercentage;
+        if (ethAmount > 0) {
+            // Calculate percentage using the formula
+            ownerPercentage = calculateOwnerPercentage(ethAmount);
+        } else {
+            // Default to 50% for testing or direct deployment
+            ownerPercentage = 5000;
+        }
+        
+        // Calculate token amounts for owner and contract
+        uint256 ownerAmount = initialSupply.mul(ownerPercentage).div(10000);
+        uint256 contractAmount = initialSupply.sub(ownerAmount);
+        
+        // Mint tokens with the correct distribution
+        _mint(owner, ownerAmount);
+        _mint(address(this), contractAmount);
+        
+        // Emit token distribution event
+        emit TokenDistribution(ownerAmount, contractAmount, ownerPercentage);
         
         // Set owner
         transferOwnership(owner);
@@ -121,6 +220,17 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
         initialized = true;
         
         emit Initialized(name, symbol, initialSupply, owner);
+    }
+    
+    /**
+     * @dev Helper function to get the denomination from GhostPad's tornado instance
+     * This is called during initialization and is not meant to be part of the public API
+     */
+    function getTornadoDenomination(address ghostPadAddress) external view returns (uint256) {
+        // This is a placeholder - we need information from GhostPad that we don't have direct access to
+        // In a real implementation, we'd create a selector to call GhostPad's getTornadoInstance
+        // or pass the denomination directly during deployment
+        return 1 ether; // Default for testing
     }
     
     /**

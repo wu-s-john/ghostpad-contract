@@ -5,7 +5,6 @@ import * as crypto from "crypto";
 // Import TypeChain factories and types
 import { 
   TokenTemplate__factory,
-  MetadataVerifier__factory, 
   GhostPad__factory, 
   Verifier__factory, 
   Hasher__factory, 
@@ -15,7 +14,6 @@ import {
 
 import type {
   TokenTemplate,
-  MetadataVerifier,
   GhostPad,
   Verifier,
   Hasher,
@@ -35,7 +33,6 @@ describe('GhostPad', function () {
   
   // Contract instances
   let tokenTemplate: TokenTemplate;
-  let metadataVerifier: MetadataVerifier;
   let verifier: Verifier;
   let hasher: Hasher;
   let tornado01: Tornado;
@@ -80,10 +77,6 @@ describe('GhostPad', function () {
     const tokenTemplateDeployed = await TokenTemplateContract.deploy();
     tokenTemplate = TokenTemplate__factory.connect(await tokenTemplateDeployed.getAddress(), deployerSigner);
     
-    // Deploy MetadataVerifier
-    const metadataVerifierFactory = new MetadataVerifier__factory(deployerSigner);
-    metadataVerifier = await metadataVerifierFactory.deploy();
-    
     // Deploy Hasher
     const hasherFactory = new Hasher__factory(deployerSigner);
     hasher = await hasherFactory.deploy();
@@ -121,7 +114,6 @@ describe('GhostPad', function () {
     ghostPad = await ghostPadFactory.deploy(
       await tokenTemplate.getAddress(),
       governance,
-      await metadataVerifier.getAddress(),
       [
         await tornado01.getAddress(),
         await tornado1.getAddress(),
@@ -162,9 +154,6 @@ describe('GhostPad', function () {
       
       // Check governance address
       expect(await ghostPad.governance()).to.equal(governance);
-      
-      // Check metadata verifier
-      expect(await ghostPad.metadataVerifier()).to.equal(await metadataVerifier.getAddress());
     });
   });
   
@@ -307,26 +296,6 @@ describe('GhostPad', function () {
   
   // Additional test for GhostPad governance
   describe('GhostPad governance', function () {
-    it('Should allow governance to update metadata verifier', async function () {
-      // Skip test if we're not running a full test suite
-      if (process.env.SKIP_GOVERNANCE_TESTS) {
-        console.log('Skipping governance test - SKIP_GOVERNANCE_TESTS is set');
-        return;
-      }
-      
-      // Deploy a new metadata verifier
-      const MetadataVerifierFactory = await ethers.getContractFactory("MetadataVerifier");
-      const newMetadataVerifier = await MetadataVerifierFactory.deploy();
-      
-      // Update metadata verifier through governance
-      const governanceSigner = await ethers.getSigner(governance);
-      // @ts-ignore - TypeScript can't verify that updateMetadataVerifier exists
-      await ghostPad.connect(governanceSigner).updateMetadataVerifier(await newMetadataVerifier.getAddress());
-      
-      // Check that the metadata verifier was updated
-      expect(await ghostPad.metadataVerifier()).to.equal(await newMetadataVerifier.getAddress());
-    });
-    
     it('Should allow governance to update protocol fee', async function () {
       // Skip test if we're not running a full test suite
       if (process.env.SKIP_GOVERNANCE_TESTS) {
