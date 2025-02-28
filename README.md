@@ -191,9 +191,9 @@ The script will:
 4. Set the initial governance fee to 3%
 5. Save all deployment information to `deployment-info.json`
 
-### Quick Deployment with NPM Scripts
+### Quick Deployment with Yarn
 
-For convenience, you can use the npm scripts for deployment:
+For convenience, you can use the yarn scripts for deployment:
 
 ```shell
 # Development deployment with mock contracts
@@ -202,8 +202,6 @@ export GOVERNANCE_ADDRESS=0xYourGovernanceAddress
 export PRIVATE_KEY=your_private_key
 export RPC_URL=your_rpc_url
 
-npm run deploy:dev
-# or
 yarn deploy:dev
 ```
 
@@ -216,8 +214,6 @@ export TORNADO_INSTANCES="[0xTornado1,0xTornado2,0xTornado3,0xTornado4]"
 export PRIVATE_KEY=your_private_key
 export RPC_URL=your_rpc_url
 
-npm run deploy:prod
-# or
 yarn deploy:prod
 ```
 
@@ -232,8 +228,6 @@ export PRIVATE_KEY=your_private_key
 export RPC_URL=your_rpc_url
 export ETHERSCAN_API_KEY=your_etherscan_api_key
 
-npm run deploy:dev:verify
-# or
 yarn deploy:dev:verify
 ```
 
@@ -246,8 +240,6 @@ export PRIVATE_KEY=your_private_key
 export RPC_URL=your_rpc_url
 export ETHERSCAN_API_KEY=your_etherscan_api_key
 
-npm run deploy:prod:verify
-# or
 yarn deploy:prod:verify
 ```
 
