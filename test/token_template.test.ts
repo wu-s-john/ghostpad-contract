@@ -21,11 +21,10 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
   const symbol = "TEST";
   const initialSupply = ethers.parseEther('1000000'); // 1M tokens
   const description = "A test token for DeFi applications";
-  const taxRate = 100; // 1% in basis points
-  let taxRecipient: string;
   const burnEnabled = true;
   const liquidityLockPeriod = 60 * 60 * 24 * 30; // 30 days
   const vestingEnabled = true;
+  const ethAmount = ethers.parseEther('1'); // 1 ETH for testing
   
   // Private keys for test accounts
   const privateKeys = [
@@ -63,8 +62,6 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
     const { provider: newProvider, wallets } = createFreshProviderAndWallets();
     provider = newProvider;
     [deployer, owner, user1, user2] = wallets;
-    
-    taxRecipient = owner.address;
     
     console.log("Connected to Anvil");
     
@@ -143,18 +140,18 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
     });
     
     it('should initialize correctly', { timeout: 70000 }, async function () {
-      // Initialize the token
-      await tokenTemplate.initialize(
+      // Initialize the token with type assertion to bypass type checking
+      // since the typings haven't been updated yet
+      await (tokenTemplate as any).initialize(
         name,
         symbol,
         initialSupply,
         deployer.address,
         description,
-        taxRate,
-        taxRecipient,
         burnEnabled,
         liquidityLockPeriod,
-        vestingEnabled
+        vestingEnabled,
+        ethAmount
       );
       
       // Check token properties
@@ -166,8 +163,6 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       expect(await tokenTemplate.totalSupply()).to.equal(initialSupply);
       expect(await tokenTemplate.description()).to.equal(description);
       expect(await tokenTemplate.owner()).to.equal(deployer.address);
-      expect(await tokenTemplate.taxRate()).to.equal(BigInt(taxRate));
-      expect(await tokenTemplate.taxRecipient()).to.equal(taxRecipient);
       expect(await tokenTemplate.burnEnabled()).to.equal(burnEnabled);
       expect(await tokenTemplate.vestingEnabled()).to.equal(vestingEnabled);
       
@@ -189,17 +184,16 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
     
     it('should prevent multiple initializations', async function () {
       // Should revert when trying to initialize again
-      await expect(tokenTemplate.initialize(
+      await expect((tokenTemplate as any).initialize(
         "Another Token",
         "ATK",
         initialSupply,
         deployer.address,
         "Another description",
-        taxRate,
-        taxRecipient,
         burnEnabled,
         liquidityLockPeriod,
-        vestingEnabled
+        vestingEnabled,
+        ethAmount
       )).to.be.rejects;
     });
   });
@@ -211,7 +205,6 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       const { provider: newProvider, wallets } = createFreshProviderAndWallets();
       provider = newProvider;
       [deployer, owner, user1, user2] = wallets;
-      taxRecipient = owner.address;
       
       // Check the nonce of the deployer to confirm it's reset
       const deployerNonce = await provider.getTransactionCount(deployer.address);
@@ -224,17 +217,18 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       
       // Initialize the token
       const testSupply = ethers.parseEther('1000000'); // 1M tokens
-      await freshToken.initialize(
+      const testEthAmount = ethers.parseEther('0'); // 0 ETH for default distribution
+      
+      await (freshToken as any).initialize(
         "Distribution Test",
         "DIST",
         testSupply,
         deployer.address,
         "Testing token distribution",
-        100, // 1% tax
-        taxRecipient,
         true,
         86400, // 1 day lock
-        false
+        false,
+        testEthAmount
       );
       
       // Get contract address
@@ -271,7 +265,6 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       const { provider: newProvider, wallets } = createFreshProviderAndWallets();
       provider = newProvider;
       [deployer, owner, user1, user2] = wallets;
-      taxRecipient = owner.address;
       
       console.log("Reconnecting to Anvil for fresh test...");
     });
@@ -281,32 +274,30 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       const freshToken = await deployFreshTokenTemplate(deployer);
       
       // Initialize it once
-      await freshToken.initialize(
+      await (freshToken as any).initialize(
         "Double Init Test",
         "DBLINT",
         ethers.parseEther('1000000'),
         deployer.address,
         "Testing double initialization",
-        100,
-        taxRecipient,
         true,
         86400,
-        false
+        false,
+        ethers.parseEther('0')
       );
       
       // Try to initialize it again - should fail
       try {
-        await freshToken.initialize(
+        await (freshToken as any).initialize(
           "Double Init Test 2",
           "DBLINT2",
           ethers.parseEther('500000'),
           user1.address,
           "Should fail",
-          200,
-          user2.address,
           false,
           43200,
-          true
+          true,
+          ethers.parseEther('1')
         );
         // If we reach here, the second initialization didn't throw an error - that's a failure
         expect.fail("Second initialization should have failed but didn't");
@@ -322,17 +313,16 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       
       // Try to initialize with zero address as owner - should fail
       try {
-        await freshToken.initialize(
+        await (freshToken as any).initialize(
           "Zero Address Test",
           "ZERO",
           ethers.parseEther('1000000'),
           "0x0000000000000000000000000000000000000000", // Zero address
           "Testing zero address validation",
-          100,
-          taxRecipient,
           true,
           86400,
-          false
+          false,
+          ethers.parseEther('0')
         );
         expect.fail("Initialization with zero address should have failed but didn't");
       } catch (error: any) {
@@ -353,17 +343,16 @@ describe('TokenTemplate', { timeout: 60000 }, function () {
       
       // Initialize token with specific parameters
       console.log("Initializing fresh token...");
-      const tx = await freshToken.initialize(
+      const tx = await (freshToken as any).initialize(
         "Event Test",
         "EVENT",
         testSupply,
         deployer.address,
         "Testing event emission",
-        100,
-        taxRecipient,
         true,
         86400,
-        false
+        false,
+        ethers.parseEther('0')
       );
       
       // Wait for transaction to be mined

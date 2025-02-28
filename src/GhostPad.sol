@@ -30,11 +30,10 @@ interface ITokenTemplate {
         uint256 initialSupply,
         address owner,
         string memory description,
-        uint256 taxRate,
-        address taxRecipient,
         bool burnEnabled,
         uint256 liquidityLockPeriod,
-        bool vestingEnabled
+        bool vestingEnabled,
+        uint256 ethAmount
     ) external;
 
     function calculateOwnerPercentage(uint256 ethAmount) external pure returns (uint256);
@@ -196,18 +195,21 @@ contract GhostPad is Ownable {
         tokenAddress = Clones.clone(tokenTemplate);
         TokenTemplate token = TokenTemplate(payable(tokenAddress));
         
-        // Initialize the token
+        // Get the ETH amount from the tornado instance for proper distribution calculation
+        TornadoInstanceInfo memory instanceInfo = tornadoInstances[proofData.instanceIndex];
+        uint256 ethAmount = instanceInfo.denomination;
+        
+        // Initialize the token without tax parameters
         token.initialize(
             tokenData.name,
             tokenData.symbol,
             tokenData.initialSupply,
             proofData.recipient,
             tokenData.description,
-            tokenData.taxRate,
-            tokenData.taxRecipient,
             tokenData.burnEnabled,
             tokenData.liquidityLockPeriod,
-            tokenData.vestingEnabled
+            tokenData.vestingEnabled,
+            ethAmount // Pass the ETH amount from the tornado instance
         );
         
         // Transfer fee if applicable
@@ -371,8 +373,6 @@ contract GhostPad is Ownable {
     
     // Define structs to pack parameters and reduce stack usage
     struct DeployParams {
-        uint256 taxRate;
-        address taxRecipient;
         bool burnEnabled;
         uint256 liquidityLockPeriod;
     }
@@ -382,8 +382,6 @@ contract GhostPad is Ownable {
         string symbol;
         uint256 initialSupply;
         string description;
-        uint256 taxRate;
-        address taxRecipient;
         bool burnEnabled;
         uint256 liquidityLockPeriod;
         uint256 liquidityTokenAmount;

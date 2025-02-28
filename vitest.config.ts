@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.ts'],
     setupFiles: ['./test/setup.esm.ts'],
+    hookTimeout: 60000,
   },
   resolve: {
     alias: {

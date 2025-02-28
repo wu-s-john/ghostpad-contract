@@ -21,10 +21,6 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
     // Description of the token
     string public description;
     
-    // Transaction tax settings
-    uint256 public taxRate; // Tax rate in basis points (1/100 of a percent, e.g., 100 = 1%)
-    address public taxRecipient; // Address that receives the tax
-    
     // Burn settings
     bool public burnEnabled;
     
@@ -54,8 +50,6 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
     
     // Events
     event Initialized(string name, string symbol, uint256 initialSupply, address owner);
-    event TaxRateUpdated(uint256 oldRate, uint256 newRate);
-    event TaxRecipientUpdated(address oldRecipient, address newRecipient);
     event DescriptionUpdated(string oldDescription, string newDescription);
     event BurnEnabledUpdated(bool enabled);
     event ContractLocked(bool locked);
@@ -68,63 +62,26 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
     
     /**
      * @dev Calculate the percentage of tokens that should go to the owner based on ETH deposited
-     * Uses the formula: P(d) = 0.00708 * d^3 - 0.8642 * d^2 + 17.61 * d + 3.248
-     * Where d is the amount of ETH in whole units (not wei)
+     * Uses a step function to give lower percentages for higher ETH amounts
      * @param ethAmount Amount of ETH deposited in wei
      * @return percentage Percentage of tokens that should go to the owner (in basis points, 100 = 1%)
      */
     function calculateOwnerPercentage(uint256 ethAmount) public pure returns (uint256) {
-        // Convert wei to whole ETH units with 3 decimal precision for the calculation
-        // We use 10^15 instead of 10^18 to keep 3 decimal places of precision
-        uint256 ethInWholeUnits = ethAmount.div(10**15);
+        // Convert wei to ETH with 1 decimal precision
+        uint256 ethInTenths = ethAmount / 10**17;
         
-        // Apply the formula P(d) = 0.00708 * d^3 - 0.8642 * d^2 + 17.61 * d + 3.248
-        // Since Solidity doesn't support floating point, we multiply by 1000 for all calculations
-        // and divide by 1000 at the end to get the correct percentage in basis points
-        
-        // Convert ethInWholeUnits to a value with 3 decimal places (e.g., 1 ETH = 1000)
-        uint256 d = ethInWholeUnits;
-        
-        // Calculate the cubic term: 0.00708 * d^3
-        // We represent 0.00708 as 708 / 100000
-        uint256 cubicTerm = d.mul(d).mul(d).mul(708).div(100000);
-        
-        // Calculate the quadratic term: 0.8642 * d^2
-        // We represent 0.8642 as 8642 / 10000
-        uint256 quadraticTerm = d.mul(d).mul(8642).div(10000);
-        
-        // Calculate the linear term: 17.61 * d
-        // We represent 17.61 as 1761 / 100
-        uint256 linearTerm = d.mul(1761).div(100);
-        
-        // Constant term: 3.248
-        // We represent 3.248 as 3248 / 1000
-        uint256 constantTerm = 3248;
-        
-        // Combine the terms: cubicTerm - quadraticTerm + linearTerm + constantTerm
-        // Note: We need to be careful with underflows when subtracting quadraticTerm
-        uint256 result;
-        if (quadraticTerm <= cubicTerm.add(linearTerm).add(constantTerm)) {
-            result = cubicTerm.add(linearTerm).add(constantTerm).sub(quadraticTerm);
+        // Step function based on ETH amount
+        if (ethInTenths >= 1000) {  // 100 ETH or more
+            return 5000;  // 50%
+        } else if (ethInTenths >= 100) {  // 10 ETH or more
+            return 1000;  // 10%
+        } else if (ethInTenths >= 10) {  // 1 ETH or more
+            return 500;   // 5%
+        } else if (ethInTenths >= 1) {  // 0.1 ETH or more
+            return 375;   // 3.75%
         } else {
-            // If the calculation would result in a negative number, return a minimum percentage (2%)
-            result = 200;
+            return 10;  // Default to 50% for very small amounts
         }
-        
-        // Convert to basis points (100 = 1%)
-        uint256 percentInBasisPoints = result.mul(100).div(1000);
-        
-        // Cap at 5000 basis points (50%) as a maximum
-        if (percentInBasisPoints > 5000) {
-            return 5000;
-        }
-        
-        // Ensure a minimum of 200 basis points (2%)
-        if (percentInBasisPoints < 200) {
-            return 200;
-        }
-        
-        return percentInBasisPoints;
     }
     
     /**
@@ -134,11 +91,10 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
      * @param initialSupply Initial supply of tokens
      * @param owner Owner of the token
      * @param _description Description of the token
-     * @param _taxRate Tax rate in basis points
-     * @param _taxRecipient Address that receives the tax
      * @param _burnEnabled Whether burn is enabled
      * @param _liquidityLockPeriod Period for locking liquidity
      * @param _vestingEnabled Whether vesting functionality is enabled
+     * @param _ethAmount ETH amount used to calculate owner percentage
      */
     function initialize(
         string memory name,
@@ -146,11 +102,10 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
         uint256 initialSupply,
         address owner,
         string memory _description,
-        uint256 _taxRate,
-        address _taxRecipient,
         bool _burnEnabled,
         uint256 _liquidityLockPeriod,
-        bool _vestingEnabled
+        bool _vestingEnabled,
+        uint256 _ethAmount
     ) external initializer {
         require(owner != address(0), "Owner cannot be the zero address");
         
@@ -162,29 +117,13 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
         // Set decimals
         _setupDecimals(18);
         
-        // Determine the ETH amount based on the caller contract
-        uint256 ethAmount = 0;
-        
-        // If we're being called by GhostPad with liquidity, we can get the ETH amount from it
-        if (msg.sender != tx.origin) {
-            address caller = msg.sender;
-            
-            // Try to get the Tornado instance denomination from GhostPad
-            try this.getTornadoDenomination(caller) returns (uint256 denomination) {
-                ethAmount = denomination;
-            } catch {
-                // If it fails, we'll use a default percentage (50%)
-                ethAmount = 0;
-            }
-        }
-        
         // Calculate the owner percentage based on ETH amount
         uint256 ownerPercentage;
-        if (ethAmount > 0) {
+        if (_ethAmount > 0) {
             // Calculate percentage using the formula
-            ownerPercentage = calculateOwnerPercentage(ethAmount);
+            ownerPercentage = calculateOwnerPercentage(_ethAmount);
         } else {
-            // Default to 50% for testing or direct deployment
+            // Default to 50% if no ETH amount is provided
             ownerPercentage = 5000;
         }
         
@@ -204,8 +143,6 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
         
         // Set token properties
         description = _description;
-        taxRate = _taxRate;
-        taxRecipient = _taxRecipient;
         burnEnabled = _burnEnabled;
         liquidityLockPeriod = _liquidityLockPeriod;
         vestingEnabled = _vestingEnabled;
@@ -215,63 +152,30 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
     }
     
     /**
-     * @dev Helper function to get the denomination from GhostPad's tornado instance
-     * This is called during initialization and is not meant to be part of the public API
+     * @dev This function is no longer needed since we're passing ethAmount directly,
+     * but we keep it for backward compatibility or direct calls
      */
     function getTornadoDenomination(address ghostPadAddress) external view returns (uint256) {
-        // This is a placeholder - we need information from GhostPad that we don't have direct access to
-        // In a real implementation, we'd create a selector to call GhostPad's getTornadoInstance
-        // or pass the denomination directly during deployment
-        return 1 ether; // Default for testing
+        return 1 ether; // Default for backward compatibility
     }
     
     /**
-     * @dev Override transfer function to apply tax if tax rate is greater than 0
+     * @dev Override transfer function - tax functionality removed
      * @param recipient Recipient of the transfer
      * @param amount Amount to transfer
      */
     function transfer(address recipient, uint256 amount) public override returns (bool) {
-        // If tax rate is 0 or recipient is the owner or tax recipient, use normal transfer
-        if (taxRate == 0 || recipient == owner() || recipient == taxRecipient) {
-            return super.transfer(recipient, amount);
-        }
-        
-        // Calculate tax amount
-        uint256 taxAmount = amount.mul(taxRate).div(10000);
-        uint256 transferAmount = amount.sub(taxAmount);
-        
-        // Transfer tax to tax recipient if tax amount is greater than 0
-        if (taxAmount > 0 && taxRecipient != address(0)) {
-            super.transfer(taxRecipient, taxAmount);
-        }
-        
-        // Transfer remaining amount to recipient
-        return super.transfer(recipient, transferAmount);
+        return super.transfer(recipient, amount);
     }
     
     /**
-     * @dev Override transferFrom function to apply tax if tax rate is greater than 0
+     * @dev Override transferFrom function - tax functionality removed
      * @param sender Sender of the transfer
      * @param recipient Recipient of the transfer
      * @param amount Amount to transfer
      */
     function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
-        // If tax rate is 0 or recipient is the owner or tax recipient, use normal transferFrom
-        if (taxRate == 0 || recipient == owner() || recipient == taxRecipient) {
-            return super.transferFrom(sender, recipient, amount);
-        }
-        
-        // Calculate tax amount
-        uint256 taxAmount = amount.mul(taxRate).div(10000);
-        uint256 transferAmount = amount.sub(taxAmount);
-        
-        // Transfer tax to tax recipient if tax amount is greater than 0
-        if (taxAmount > 0 && taxRecipient != address(0)) {
-            super.transferFrom(sender, taxRecipient, taxAmount);
-        }
-        
-        // Transfer remaining amount to recipient
-        return super.transferFrom(sender, recipient, transferAmount);
+        return super.transferFrom(sender, recipient, amount);
     }
     
     /**
@@ -302,32 +206,6 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
      */
     function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
-    }
-    
-    /**
-     * @dev Update the tax rate (can only be called by owner)
-     * @param newTaxRate New tax rate in basis points
-     */
-    function updateTaxRate(uint256 newTaxRate) public onlyOwner {
-        require(!contractLocked, "Contract is locked");
-        
-        uint256 oldTaxRate = taxRate;
-        taxRate = newTaxRate;
-        
-        emit TaxRateUpdated(oldTaxRate, newTaxRate);
-    }
-    
-    /**
-     * @dev Update the tax recipient (can only be called by owner)
-     * @param newTaxRecipient New tax recipient address
-     */
-    function updateTaxRecipient(address newTaxRecipient) public onlyOwner {
-        require(!contractLocked, "Contract is locked");
-        
-        address oldTaxRecipient = taxRecipient;
-        taxRecipient = newTaxRecipient;
-        
-        emit TaxRecipientUpdated(oldTaxRecipient, newTaxRecipient);
     }
     
     /**

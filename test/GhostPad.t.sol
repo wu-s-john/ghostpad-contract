@@ -82,8 +82,6 @@ contract GhostPadTest is Test {
         tokenData.symbol = "TEST";
         tokenData.initialSupply = 1000000 * 10**18; // 1M tokens
         tokenData.description = "A test token for GhostPad";
-        tokenData.taxRate = 100; // 1%
-        tokenData.taxRecipient = address(10); // Some tax recipient
         tokenData.burnEnabled = true;
         tokenData.liquidityLockPeriod = 365 days; // 1 year
         tokenData.liquidityTokenAmount = 500000 * 10**18; // 50% of tokens for liquidity by default

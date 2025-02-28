@@ -35,7 +35,6 @@ describe('GhostPad', { timeout: 60000 }, function () {
   let depositor: ethers.Wallet;
   let recipient: ethers.Wallet;
   let relayer: ethers.Wallet;
-  let taxRecipient: ethers.Wallet;
   
   // Real contract instances
   let tokenTemplate: TokenTemplate;
@@ -61,7 +60,6 @@ describe('GhostPad', { timeout: 60000 }, function () {
   const tokenSymbol = "GHOST";
   const tokenSupply = ethers.parseEther('1000000'); // 1M tokens
   const tokenDescription = "A privacy-focused memecoin for testing";
-  const taxRate = 100; // 1% in basis points
   const burnEnabled = true;
   const liquidityLockPeriod = 60 * 60 * 24 * 30; // 30 days
   
@@ -97,7 +95,7 @@ describe('GhostPad', { timeout: 60000 }, function () {
     ];
     
     // Create wallet instances
-    [deployer, governance, depositor, recipient, relayer, taxRecipient] = privateKeys.map(
+    [deployer, governance, depositor, recipient, relayer] = privateKeys.map(
       pk => new ethers.Wallet(pk, provider)
     );
     
@@ -106,8 +104,7 @@ describe('GhostPad', { timeout: 60000 }, function () {
       governance.address,
       depositor.address,
       recipient.address,
-      relayer.address,
-      taxRecipient.address
+      relayer.address
     ];
     
     // Get contract factories
@@ -249,14 +246,15 @@ describe('GhostPad', { timeout: 60000 }, function () {
       // Then call deployToken with the appropriate parameters
       // This is simplified - you'd need actual proof data
       
-      // Create token data structure
+      // Create token data structure with null values for tax fields until typedefs are updated
+      // Include the tax fields to maintain compatibility with the current typedefs
       const tokenData = {
         name: "Test Token",
         symbol: "TEST",
         initialSupply: tokenSupply,
         description: tokenDescription,
-        taxRate: taxRate,
-        taxRecipient: taxRecipient.address,
+        taxRate: 0, // Set to 0 but keep for type compatibility
+        taxRecipient: ethers.ZeroAddress, // Use zero address but keep for type compatibility
         burnEnabled: burnEnabled,
         liquidityLockPeriod: liquidityLockPeriod,
         liquidityTokenAmount: ethers.parseEther('500000'), // 50% for liquidity
@@ -302,13 +300,14 @@ describe('GhostPad', { timeout: 60000 }, function () {
       });
       
       // Create token data structure with liquidity parameters
+      // Include the tax fields to maintain compatibility with the current typedefs
       const tokenData = {
         name: "Liquid Test Token",
         symbol: "LIQ",
         initialSupply: tokenSupply,
         description: "Token with Uniswap liquidity for testing",
-        taxRate: taxRate,
-        taxRecipient: taxRecipient.address,
+        taxRate: 0, // Set to 0 but keep for type compatibility
+        taxRecipient: ethers.ZeroAddress, // Use zero address but keep for type compatibility
         burnEnabled: burnEnabled,
         liquidityLockPeriod: liquidityLockPeriod,
         liquidityTokenAmount: ethers.parseEther('500000'), // 50% for liquidity
@@ -439,10 +438,6 @@ describe('GhostPad', { timeout: 60000 }, function () {
       
       // Verify that the buyer received tokens
       expect(buyerBalance).to.be.gt(0);
-      
-      // Optionally check tax recipient's balance if tax was applied
-      const taxRecipientBalance = await token.balanceOf(taxRecipient.address);
-      console.log(`Tax recipient received ${ethers.formatEther(taxRecipientBalance)} LIQ tokens`);
       
       // No need to reset proof bypass since we didn't set it
       // await connectedGhostPad.setProofBypass(false);
