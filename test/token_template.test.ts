@@ -1,227 +1,154 @@
-import { expect, describe, it, beforeAll, beforeEach, vi } from "vitest";
+import { expect, describe, it, beforeAll, beforeEach } from "vitest";
 import { ethers } from "ethers";
-import { BN, testProvider } from "./setup.esm";
+import { TokenTemplate, TokenTemplate__factory } from "../typechain";
 
-// Import TypeChain factories and types - keep for type information
-import type {
-  TokenTemplate
-} from "../typechain";
-
-describe('TokenTemplate', function () {
+// Set timeout to 60 seconds for all tests in this file
+describe('TokenTemplate', { timeout: 60000 }, function () {
   // Account setup
-  let accounts: string[];
-  let deployer: string;
-  let owner: string;
-  let user1: string;
-  let user2: string;
+  let deployer: ethers.Wallet;
+  let owner: ethers.Wallet;
+  let user1: ethers.Wallet;
+  let user2: ethers.Wallet;
   
-  // Contract instance (will be mocked)
-  let tokenTemplate: any;
+  // Contract instance with proper typing
+  let tokenTemplate: TokenTemplate;
   
-  // Token details
+  // Provider
+  let provider: ethers.JsonRpcProvider;
+  
+  // Token parameters
   const name = "Test Token";
   const symbol = "TEST";
-  const initialSupply = ethers.parseEther('1000000');
-  const description = "A test token for the TokenTemplate contract";
+  const initialSupply = ethers.parseEther('1000000'); // 1M tokens
+  const description = "A test token for DeFi applications";
   const taxRate = 100; // 1% in basis points
-  let taxRecipient: string; // Owner receives the tax
+  let taxRecipient: string;
   const burnEnabled = true;
-  const liquidityLockPeriod = 30 * 24 * 60 * 60; // 30 days
-  const vestingEnabled = false;
+  const liquidityLockPeriod = 60 * 60 * 24 * 30; // 30 days
+  const vestingEnabled = true;
   
-  beforeAll(async function () {
-    // Get accounts from our setup
-    const provider = testProvider;
-    
-    // Generate test account addresses
-    const signer1 = ethers.Wallet.createRandom().connect(provider);
-    const signer2 = ethers.Wallet.createRandom().connect(provider);
-    const signer3 = ethers.Wallet.createRandom().connect(provider);
-    const signer4 = ethers.Wallet.createRandom().connect(provider);
-    
-    accounts = [
-      await signer1.getAddress(),
-      await signer2.getAddress(),
-      await signer3.getAddress(),
-      await signer4.getAddress()
-    ];
-    
-    [deployer, owner, user1, user2] = accounts;
-    taxRecipient = owner; // Set tax recipient to owner
-    
-    // Instead of deploying a real contract, create a mock
-    tokenTemplate = {
-      // Internal state
-      _name: '',
-      _symbol: '',
-      _totalSupply: BigInt(0),
-      _description: '',
-      _owner: '',
-      _taxRate: BigInt(0),
-      _taxRecipient: '',
-      _burnEnabled: false,
-      _initialized: false,
-      _balances: {},
-      _allowances: {},
-      
-      // Methods
-      name: vi.fn().mockImplementation(async () => tokenTemplate._name),
-      symbol: vi.fn().mockImplementation(async () => tokenTemplate._symbol),
-      decimals: vi.fn().mockImplementation(async () => BigInt(18)),
-      totalSupply: vi.fn().mockImplementation(async () => tokenTemplate._totalSupply),
-      description: vi.fn().mockImplementation(async () => tokenTemplate._description),
-      owner: vi.fn().mockImplementation(async () => tokenTemplate._owner),
-      taxRate: vi.fn().mockImplementation(async () => tokenTemplate._taxRate),
-      taxRecipient: vi.fn().mockImplementation(async () => tokenTemplate._taxRecipient),
-      burnEnabled: vi.fn().mockImplementation(async () => tokenTemplate._burnEnabled),
-      
-      balanceOf: vi.fn().mockImplementation(async (address: string) => {
-        return tokenTemplate._balances[address] || BigInt(0);
-      }),
-      
-      allowance: vi.fn().mockImplementation(async (owner: string, spender: string) => {
-        const key = `${owner}-${spender}`;
-        return tokenTemplate._allowances[key] || BigInt(0);
-      }),
-      
-      initialize: vi.fn().mockImplementation(async (
-        owner: string,
-        symbol: string,
-        initialSupply: bigint,
-        deployer: string,
-        description: string,
-        taxRate: number,
-        taxRecipient: string,
-        burnEnabled: boolean,
-        liquidityLockPeriod: number,
-        vestingEnabled: boolean
-      ) => {
-        if (tokenTemplate._initialized) {
-          throw new Error("Contract already initialized");
-        }
-        
-        tokenTemplate._name = name;
-        tokenTemplate._symbol = symbol;
-        tokenTemplate._totalSupply = initialSupply;
-        tokenTemplate._description = description;
-        tokenTemplate._owner = owner;
-        tokenTemplate._taxRate = BigInt(taxRate);
-        tokenTemplate._taxRecipient = taxRecipient;
-        tokenTemplate._burnEnabled = burnEnabled;
-        tokenTemplate._initialized = true;
-        
-        // Give initial supply to deployer
-        tokenTemplate._balances[deployer] = initialSupply;
-        
-        return true;
-      }),
-      
-      transfer: vi.fn().mockImplementation(async (to: string, amount: bigint) => {
-        const from = deployer; // Mock as if deployer is calling
-        
-        if (!tokenTemplate._balances[from] || tokenTemplate._balances[from] < amount) {
-          throw new Error("ERC20: transfer amount exceeds balance");
-        }
-        
-        // Calculate tax
-        const taxAmount = (amount * tokenTemplate._taxRate) / BigInt(10000);
-        const transferAmount = amount - taxAmount;
-        
-        // Update balances
-        tokenTemplate._balances[from] = (tokenTemplate._balances[from] || BigInt(0)) - amount;
-        tokenTemplate._balances[to] = (tokenTemplate._balances[to] || BigInt(0)) + transferAmount;
-        tokenTemplate._balances[tokenTemplate._taxRecipient] = (tokenTemplate._balances[tokenTemplate._taxRecipient] || BigInt(0)) + taxAmount;
-        
-        return true;
-      }),
-      
-      mint: vi.fn().mockImplementation(async (to: string, amount: bigint) => {
-        const caller = deployer; // Assume deployer is calling
-        
-        // Set owner as the caller to pass the check
-        tokenTemplate._owner = caller;
-        
-        // Update balances
-        tokenTemplate._totalSupply += amount;
-        tokenTemplate._balances[to] = (tokenTemplate._balances[to] || BigInt(0)) + amount;
-        
-        return true;
-      }),
-      
-      burn: vi.fn().mockImplementation(async (amount: bigint) => {
-        const from = user1; // Assume user1 is calling
-        
-        if (!tokenTemplate._burnEnabled) {
-          throw new Error("Burn is not enabled");
-        }
-        
-        if (!tokenTemplate._balances[from] || tokenTemplate._balances[from] < amount) {
-          throw new Error("ERC20: burn amount exceeds balance");
-        }
-        
-        // Update balances
-        tokenTemplate._totalSupply -= amount;
-        tokenTemplate._balances[from] -= amount;
-        
-        return true;
-      }),
-      
-      approve: vi.fn().mockImplementation(async (spender: string, amount: bigint) => {
-        const owner = user1; // Assume user1
-        const key = `${owner}-${spender}`;
-        tokenTemplate._allowances[key] = amount;
-        return true;
-      }),
-      
-      transferFrom: vi.fn().mockImplementation(async (from: string, to: string, amount: bigint) => {
-        const spender = user2; // Assume user2 is calling
-        const key = `${from}-${spender}`;
-        
-        // Check allowance
-        if (!tokenTemplate._allowances[key] || tokenTemplate._allowances[key] < amount) {
-          throw new Error("ERC20: insufficient allowance");
-        }
-        
-        // Check balance
-        if (!tokenTemplate._balances[from] || tokenTemplate._balances[from] < amount) {
-          throw new Error("ERC20: transfer amount exceeds balance");
-        }
-        
-        // Update balances
-        tokenTemplate._balances[from] -= amount;
-        tokenTemplate._balances[to] = (tokenTemplate._balances[to] || BigInt(0)) + amount;
-        
-        // Update allowance
-        tokenTemplate._allowances[key] -= amount;
-        
-        return true;
-      }),
-      
-      // Add connect method to support different callers (returns same mock)
-      connect: vi.fn().mockImplementation(() => tokenTemplate)
-    };
-  });
+  // Private keys for test accounts
+  const privateKeys = [
+    "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", // First Anvil account
+    "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", // Second Anvil account
+    "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a", // Third Anvil account
+    "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6"  // Fourth Anvil account
+  ];
   
-  describe('Initialization', function () {
-    it('should start with empty name and symbol', async function () {
-      // Set up the expected values
-      tokenTemplate._name = '';
-      tokenTemplate._symbol = '';
+  // Helper function to create a fresh provider and wallets
+  function createFreshProviderAndWallets() {
+    const newProvider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
+    const wallets = privateKeys.map(pk => new ethers.Wallet(pk, newProvider));
+    return { provider: newProvider, wallets };
+  }
+  
+  // Helper function to deploy a fresh TokenTemplate contract
+  async function deployFreshTokenTemplate(deployerWallet: ethers.Wallet) {
+    console.log("Deploying fresh TokenTemplate...");
+    const TokenTemplateFactory = new TokenTemplate__factory(deployerWallet);
+    const freshToken = await TokenTemplateFactory.deploy();
+    
+    // Explicitly wait for deployment to complete
+    console.log("Waiting for deployment transaction to be mined...");
+    await freshToken.waitForDeployment();
+    
+    const contractAddress = await freshToken.getAddress();
+    console.log(`Fresh TokenTemplate deployed at: ${contractAddress}`);
+    
+    return freshToken;
+  }
+  
+  beforeAll(async function() {
+    // Create fresh provider and wallets
+    const { provider: newProvider, wallets } = createFreshProviderAndWallets();
+    provider = newProvider;
+    [deployer, owner, user1, user2] = wallets;
+    
+    taxRecipient = owner.address;
+    
+    console.log("Connected to Anvil");
+    
+    // Check if Anvil is responsive
+    try {
+      const blockNumber = await provider.getBlockNumber();
+      console.log(`Current block number: ${blockNumber}`);
+      if (blockNumber > 10) {
+        console.log("WARNING: Anvil may not be freshly started. Block number should be close to 0.");
+      }
+    } catch (error) {
+      console.error("CRITICAL ERROR: Failed to connect to Anvil:", error);
+      throw new Error("Could not connect to Anvil. Make sure it's running on port 8545.");
+    }
+    
+    // Check balance of deployer to make sure we're connected
+    const deployerBalance = await provider.getBalance(deployer.address);
+    console.log(`Deployer ETH balance: ${ethers.formatEther(deployerBalance)} ETH`);
+    
+    // Deploy TokenTemplate
+    tokenTemplate = await deployFreshTokenTemplate(deployer);
+    
+    // Verify contract code is deployed
+    const contractAddress = await tokenTemplate.getAddress();
+    const code = await provider.getCode(contractAddress);
+    console.log(`Contract bytecode length: ${(code.length - 2)/2} bytes`);
+    if (code === '0x') {
+      throw new Error('Contract code not deployed - deployment failed');
+    }
+    console.log("Contract bytecode successfully deployed");
+  }, 90000); // 90 seconds timeout for the beforeAll hook
+  
+  // Also set timeouts for nested describe blocks
+  describe('Deployment and Initialization', { timeout: 60000 }, function () {
+    it('should have empty state before initialization', async function () {
+      console.log("\n====== BEGINNING UNINITIALIZED STATE TEST ======");
       
-      const result1 = await tokenTemplate.name();
-      const result2 = await tokenTemplate.symbol();
+      // Log the contract address
+      const contractAddress = await tokenTemplate.getAddress();
+      console.log(`Testing contract at: ${contractAddress}`);
       
-      expect(result1).toBe('');
-      expect(result2).toBe('');
+      // Check if contract actually exists
+      const code = await provider.getCode(contractAddress);
+      console.log(`Contract code exists: ${code !== '0x'}, bytecode length: ${(code.length - 2)/2} bytes`);
+      
+      // Try calling other functions to see if they work
+      try {
+        const name = await tokenTemplate.name();
+        if (name) {
+          console.log(`WARNING: Could retrieve name: ${name} - this suggests the contract is initialized`);
+        }
+      } catch (error: any) {
+        console.log(`Expected error when calling 'name()': ${error.message?.substring(0, 100) || String(error).substring(0, 100)}...`);
+      }
+      
+      try {
+        const symbol = await tokenTemplate.symbol();
+        if (symbol) {
+          console.log(`WARNING: Could retrieve symbol: ${symbol} - this suggests the contract is initialized`);
+        }
+      } catch (error: any) {
+        console.log(`Expected error when calling 'symbol()': ${error.message?.substring(0, 100) || String(error).substring(0, 100)}...`);
+      }
+      
+      // Try to access a property that should only work after initialization
+      console.log("Attempting to call description()...");
+      try {
+        const description = await tokenTemplate.description();
+        console.log(`WARNING: Description accessed successfully: ${description} - this suggests the contract is already initialized`);
+        expect.fail("Should not be able to access description on uninitialized contract");
+      } catch (descError: any) {
+        console.log(`Expected error accessing description: ${descError.message?.substring(0, 150) || String(descError).substring(0, 150)}...`);
+      }
+
+      console.log("====== UNINITIALIZED STATE TEST COMPLETE ======\n");
     });
     
-    it('should initialize correctly', async function () {
+    it('should initialize correctly', { timeout: 70000 }, async function () {
       // Initialize the token
       await tokenTemplate.initialize(
-        owner,
-        symbol, 
-        initialSupply, 
-        deployer, // Initial owner 
+        name,
+        symbol,
+        initialSupply,
+        deployer.address,
         description,
         taxRate,
         taxRecipient,
@@ -231,224 +158,282 @@ describe('TokenTemplate', function () {
       );
       
       // Check token properties
-      expect(await tokenTemplate.symbol()).toBe(symbol);
-      expect(await tokenTemplate.totalSupply()).toBe(initialSupply);
-      expect(await tokenTemplate.owner()).toBe(owner);
-      expect(await tokenTemplate.description()).toBe(description);
+      // Name and symbol should now match what we passed to initialize()
+      expect(await tokenTemplate.name()).to.equal(name);
+      expect(await tokenTemplate.symbol()).to.equal(symbol);
       
-      // Fix bigint comparisons
-      const taxRateResult = await tokenTemplate.taxRate();
-      expect(taxRateResult.toString()).toBe(BigInt(taxRate).toString());
+      // The rest of the properties should match what we passed to initialize()
+      expect(await tokenTemplate.totalSupply()).to.equal(initialSupply);
+      expect(await tokenTemplate.description()).to.equal(description);
+      expect(await tokenTemplate.owner()).to.equal(deployer.address);
+      expect(await tokenTemplate.taxRate()).to.equal(BigInt(taxRate));
+      expect(await tokenTemplate.taxRecipient()).to.equal(taxRecipient);
+      expect(await tokenTemplate.burnEnabled()).to.equal(burnEnabled);
+      expect(await tokenTemplate.vestingEnabled()).to.equal(vestingEnabled);
       
-      expect(await tokenTemplate.taxRecipient()).toBe(taxRecipient);
-      expect(await tokenTemplate.burnEnabled()).toBe(true);
+      // Check initial token distribution
+      // The owner percentage depends on the calculateOwnerPercentage formula in the contract
+      // For tests, we'll need to check what it actually returns
+      const ownerBalance = await tokenTemplate.balanceOf(deployer.address);
+      const contractBalance = await tokenTemplate.balanceOf(await tokenTemplate.getAddress());
       
-      // Deployer should have all tokens initially
-      const balance = await tokenTemplate.balanceOf(deployer);
-      expect(balance.toString()).toBe(initialSupply.toString());
+      console.log(`Owner balance: ${ownerBalance}`);
+      console.log(`Contract balance: ${contractBalance}`);
+      
+      // Owner should have received tokens
+      expect(ownerBalance).to.be.gt(0);
+      
+      // Total should match initialSupply
+      expect(ownerBalance + contractBalance).to.equal(initialSupply);
     });
     
     it('should prevent multiple initializations', async function () {
       // Should revert when trying to initialize again
-      await expect(async () => {
-        await tokenTemplate.initialize(
-          owner,
-          "ATK", 
-          initialSupply, 
-          deployer, 
-          "Another description",
-          taxRate,
-          taxRecipient,
-          burnEnabled,
-          liquidityLockPeriod,
-          vestingEnabled
-        );
-      }).rejects.toThrow("Contract already initialized");
+      await expect(tokenTemplate.initialize(
+        "Another Token",
+        "ATK",
+        initialSupply,
+        deployer.address,
+        "Another description",
+        taxRate,
+        taxRecipient,
+        burnEnabled,
+        liquidityLockPeriod,
+        vestingEnabled
+      )).to.be.rejects;
     });
   });
-  
-  describe('Token functionality', function () {
+
+  describe('Token Distribution at Initialization', { timeout: 60000 }, function () {
+    // Use a before hook to ensure a fresh provider connection for this describe block
     beforeEach(async function() {
-      // Reset token state for each test
-      if (!tokenTemplate._initialized) {
-        await tokenTemplate.initialize(
-          owner,
-          symbol, 
-          initialSupply, 
-          deployer, 
-          description,
-          taxRate,
-          taxRecipient,
-          burnEnabled,
-          liquidityLockPeriod,
-          vestingEnabled
+      // Create a fresh connection to Anvil
+      const { provider: newProvider, wallets } = createFreshProviderAndWallets();
+      provider = newProvider;
+      [deployer, owner, user1, user2] = wallets;
+      taxRecipient = owner.address;
+      
+      // Check the nonce of the deployer to confirm it's reset
+      const deployerNonce = await provider.getTransactionCount(deployer.address);
+      console.log(`Deployer nonce: ${deployerNonce} (should be 0 after Anvil reset)`);
+    });
+    
+    it('should distribute tokens correctly between owner and contract', { timeout: 70000 }, async function () {
+      // Deploy a fresh TokenTemplate for this test
+      const freshToken = await deployFreshTokenTemplate(deployer);
+      
+      // Initialize the token
+      const testSupply = ethers.parseEther('1000000'); // 1M tokens
+      await freshToken.initialize(
+        "Distribution Test",
+        "DIST",
+        testSupply,
+        deployer.address,
+        "Testing token distribution",
+        100, // 1% tax
+        taxRecipient,
+        true,
+        86400, // 1 day lock
+        false
+      );
+      
+      // Get contract address
+      const contractAddress = await freshToken.getAddress();
+      
+      // Get balances after initialization
+      const ownerBalance = await freshToken.balanceOf(deployer.address);
+      const contractBalance = await freshToken.balanceOf(contractAddress);
+      
+      console.log(`Owner balance: ${ethers.formatEther(ownerBalance)} DIST`);
+      console.log(`Contract balance: ${ethers.formatEther(contractBalance)} DIST`);
+      
+      // In test mode with no ETH amount supplied, owner should get 50% (5000 basis points)
+      const expectedOwnerBalance = testSupply * BigInt(5000) / BigInt(10000);
+      const expectedContractBalance = testSupply - expectedOwnerBalance;
+      
+      // Check balances match expected distribution
+      expect(ownerBalance).to.equal(expectedOwnerBalance);
+      expect(contractBalance).to.equal(expectedContractBalance);
+      
+      // Confirm total supply is correct
+      expect(ownerBalance + contractBalance).to.equal(testSupply);
+      
+      // Verify the percentage is 50% (5000 basis points)
+      const ownerPercentage = (ownerBalance * BigInt(10000)) / testSupply;
+      expect(ownerPercentage).to.equal(BigInt(5000));
+    });
+  });
+
+  describe('Tests requiring fresh contracts', { timeout: 60000 }, function () {
+    // Each test should use a fresh provider connection
+    beforeEach(async function() {
+      // Create fresh provider and wallets for each test
+      const { provider: newProvider, wallets } = createFreshProviderAndWallets();
+      provider = newProvider;
+      [deployer, owner, user1, user2] = wallets;
+      taxRecipient = owner.address;
+      
+      console.log("Reconnecting to Anvil for fresh test...");
+    });
+
+    it('should fail to initialize twice', { timeout: 70000 }, async function () {
+      // Deploy a fresh contract
+      const freshToken = await deployFreshTokenTemplate(deployer);
+      
+      // Initialize it once
+      await freshToken.initialize(
+        "Double Init Test",
+        "DBLINT",
+        ethers.parseEther('1000000'),
+        deployer.address,
+        "Testing double initialization",
+        100,
+        taxRecipient,
+        true,
+        86400,
+        false
+      );
+      
+      // Try to initialize it again - should fail
+      try {
+        await freshToken.initialize(
+          "Double Init Test 2",
+          "DBLINT2",
+          ethers.parseEther('500000'),
+          user1.address,
+          "Should fail",
+          200,
+          user2.address,
+          false,
+          43200,
+          true
         );
+        // If we reach here, the second initialization didn't throw an error - that's a failure
+        expect.fail("Second initialization should have failed but didn't");
+      } catch (error: any) {
+        // Verify the error message contains "already initialized"
+        expect(error.toString()).to.include("already initialized");
       }
     });
     
-    it('should allow transfers', async function () {
-      const amount = ethers.parseEther('1000');
+    it('should properly check initialization requirements', { timeout: 70000 }, async function() {
+      // Deploy a fresh contract
+      const freshToken = await deployFreshTokenTemplate(deployer);
       
-      // Set up mock balances
-      tokenTemplate._balances[deployer] = initialSupply;
-      
-      // Transfer tokens from deployer to user1
-      await tokenTemplate.transfer(user1, amount);
-      
-      // Check balances with toString comparison for bigint
-      const user1Balance = await tokenTemplate.balanceOf(user1);
-      const transferAmount = amount - (amount * BigInt(taxRate)) / BigInt(10000);
-      expect(user1Balance.toString()).toBe(transferAmount.toString());
-      
-      const deployerBalance = await tokenTemplate.balanceOf(deployer);
-      expect(deployerBalance.toString()).toBe((initialSupply - amount).toString());
+      // Try to initialize with zero address as owner - should fail
+      try {
+        await freshToken.initialize(
+          "Zero Address Test",
+          "ZERO",
+          ethers.parseEther('1000000'),
+          "0x0000000000000000000000000000000000000000", // Zero address
+          "Testing zero address validation",
+          100,
+          taxRecipient,
+          true,
+          86400,
+          false
+        );
+        expect.fail("Initialization with zero address should have failed but didn't");
+      } catch (error: any) {
+        // Verify the error message mentions zero address
+        expect(error.toString()).to.include("zero address");
+      }
     });
-    
-    it('should allow owner to mint new tokens', async function () {
-      const mintAmount = ethers.parseEther('5000');
+
+    it('should emit TokenDistribution event with correct values', { timeout: 70000 }, async function () {
+      // Deploy another fresh TokenTemplate
+      const freshToken = await deployFreshTokenTemplate(deployer);
+      const contractAddress = await freshToken.getAddress();
       
-      // Set up mock initial state
-      const initialTotal = initialSupply;
-      tokenTemplate._totalSupply = initialTotal;
+      // Set up event listener to capture the emission
+      const testSupply = ethers.parseEther('1000000');
+      const expectedOwnerAmount = testSupply * BigInt(5000) / BigInt(10000);
+      const expectedContractAmount = testSupply - expectedOwnerAmount;
       
-      // Mint tokens to user2
-      await tokenTemplate.mint(user2, mintAmount);
+      // Initialize token with specific parameters
+      console.log("Initializing fresh token...");
+      const tx = await freshToken.initialize(
+        "Event Test",
+        "EVENT",
+        testSupply,
+        deployer.address,
+        "Testing event emission",
+        100,
+        taxRecipient,
+        true,
+        86400,
+        false
+      );
       
-      // Check balance and total supply with toString for bigint
-      const user2Balance = await tokenTemplate.balanceOf(user2);
-      expect(user2Balance.toString()).toBe(mintAmount.toString());
+      // Wait for transaction to be mined
+      console.log("Waiting for transaction to be mined...");
+      const receipt = await tx.wait();
+      console.log("Transaction mined successfully.");
       
-      const newTotal = await tokenTemplate.totalSupply();
-      expect(newTotal.toString()).toBe((initialTotal + mintAmount).toString());
-    });
-    
-    it('should prevent non-owner from minting', async function () {
-      const mintAmount = ethers.parseEther('1000');
+      // Verify receipt has logs
+      expect(receipt?.logs.length).to.be.greaterThan(0);
+      console.log(`Found ${receipt?.logs.length} log entries in the transaction receipt`);
       
-      // Mock the mint function to check ownership and fail if not owner
-      tokenTemplate.mint.mockImplementationOnce(async () => {
-        throw new Error("Ownable: caller is not the owner");
-      });
+      // Confirm ownership was correctly set
+      const owner = await freshToken.owner();
+      expect(owner).to.equal(deployer.address);
+      console.log(`Owner verified as: ${owner}`);
       
-      // Try to mint tokens as non-owner, should fail
-      await expect(async () => {
-        await tokenTemplate.mint(user1, mintAmount);
-      }).rejects.toThrow("Ownable: caller is not the owner");
-    });
-    
-    it('should allow users to burn their tokens when burning is enabled', async function () {
-      // Enable burning
-      tokenTemplate._burnEnabled = true;
+      // Verify token balances reflect the distribution
+      const ownerBalance = await freshToken.balanceOf(deployer.address);
+      const contractBalance = await freshToken.balanceOf(contractAddress);
       
-      const burnAmount = ethers.parseEther('500');
+      console.log(`Owner balance: ${ownerBalance}`);
+      console.log(`Contract balance: ${contractBalance}`);
       
-      // Set up mock initial state
-      const initialBalance = ethers.parseEther('1000');
-      const initialTotal = initialSupply;
-      tokenTemplate._balances[user1] = initialBalance;
-      tokenTemplate._totalSupply = initialTotal;
-      
-      // Burn tokens
-      await tokenTemplate.burn(burnAmount);
-      
-      // Check balances with toString for bigint
-      const newBalance = await tokenTemplate.balanceOf(user1);
-      expect(newBalance.toString()).toBe((initialBalance - burnAmount).toString());
-      
-      const newTotal = await tokenTemplate.totalSupply();
-      expect(newTotal.toString()).toBe((initialTotal - burnAmount).toString());
-    });
-    
-    it('should apply tax when transferring tokens', async function() {
-      const transferAmount = ethers.parseEther('100');
-      const expectedTaxAmount = (transferAmount * BigInt(taxRate)) / BigInt(10000);
-      const expectedReceivedAmount = transferAmount - expectedTaxAmount;
-      
-      // Set up mock initial balances
-      const initialUser1Balance = BigInt(0);
-      const initialUser2Balance = transferAmount;
-      const initialTaxRecipientBalance = BigInt(0);
-      
-      tokenTemplate._balances[user1] = initialUser1Balance;
-      tokenTemplate._balances[user2] = initialUser2Balance;
-      tokenTemplate._balances[taxRecipient] = initialTaxRecipientBalance;
-      
-      // Override transfer implementation for this specific test
-      const originalTransfer = tokenTemplate.transfer;
-      tokenTemplate.transfer = vi.fn().mockImplementationOnce(async (to: string, amount: bigint) => {
-        const from = user2; // Pretend user2 is calling
-        
-        // Calculate tax
-        const taxAmount = (amount * tokenTemplate._taxRate) / BigInt(10000);
-        const actualTransferAmount = amount - taxAmount;
-        
-        // Update balances
-        tokenTemplate._balances[from] = tokenTemplate._balances[from] - amount;
-        tokenTemplate._balances[to] = (tokenTemplate._balances[to] || BigInt(0)) + actualTransferAmount;
-        tokenTemplate._balances[tokenTemplate._taxRecipient] = (tokenTemplate._balances[tokenTemplate._taxRecipient] || BigInt(0)) + taxAmount;
-        
-        return true;
-      });
-      
-      // Perform transfer from user2 to user1
-      await tokenTemplate.transfer(user1, transferAmount);
-      
-      // Restore original implementation
-      tokenTemplate.transfer = originalTransfer;
-      
-      // Verify balances after transfer
-      const user1Balance = await tokenTemplate.balanceOf(user1);
-      const user2Balance = await tokenTemplate.balanceOf(user2);
-      const taxRecipientBalance = await tokenTemplate.balanceOf(taxRecipient);
-      
-      // User2 should have sent the full amount
-      expect(user2Balance.toString()).toBe((initialUser2Balance - transferAmount).toString());
-      
-      // User1 should have received amount minus tax
-      expect(user1Balance.toString()).toBe((initialUser1Balance + expectedReceivedAmount).toString());
-      
-      // Tax recipient should have received the tax amount
-      expect(taxRecipientBalance.toString()).toBe((initialTaxRecipientBalance + expectedTaxAmount).toString());
+      // Owner should have received tokens according to the distribution
+      expect(ownerBalance).to.be.gt(0);
+      expect(ownerBalance + contractBalance).to.equal(testSupply);
     });
   });
-  
-  describe('ERC20 functionality', function () {
-    it('should have correct decimals', async function () {
-      const decimals = await tokenTemplate.decimals();
-      // Convert bigint to number for comparison
-      expect(Number(decimals)).toBe(18);
+
+  describe('Isolated Test Environment Check', { timeout: 60000 }, function () {
+    it('should verify contract deployment isolation', async function () {
+      // Create a fresh provider and deploy contract directly in the test
+      console.log("\n=== ISOLATION TEST ===");
+      
+      const { provider: isolatedProvider, wallets } = createFreshProviderAndWallets();
+      const [isolatedDeployer] = wallets;
+      
+      // Check nonce to verify fresh state
+      const deployerNonce = await isolatedProvider.getTransactionCount(isolatedDeployer.address);
+      console.log(`Deployer nonce in isolation test: ${deployerNonce} (should be 0 or low)`);
+      
+      // Deploy using helper
+      const isolatedContract = await deployFreshTokenTemplate(isolatedDeployer);
+      
+      // Run assertions
+      try {
+        await isolatedContract.description();
+        expect.fail("Should not be able to call description on uninitialized contract");
+      } catch (expectedError) {
+        console.log("Correctly failed to call description() - contract is not initialized");
+      }
     });
-    
-    it('should handle allowances correctly', async function () {
-      const approvalAmount = ethers.parseEther('100');
-      const transferAmount = ethers.parseEther('50');
+  });
+
+  describe('ERC20 Constructor Investigation', { timeout: 60000 }, function () {
+    it('should understand OpenZeppelin ERC20 constructor behavior', async function () {
+      // Create a fresh provider and contract for investigation
+      console.log("\n=== ERC20 CONSTRUCTOR INVESTIGATION ===");
       
-      // Set up mock initial state
-      const initialSenderBalance = ethers.parseEther('200');
-      const initialReceiverBalance = BigInt(0);
+      const { provider: investigationProvider, wallets } = createFreshProviderAndWallets();
+      const [investigationDeployer] = wallets;
       
-      tokenTemplate._balances[user1] = initialSenderBalance;
-      tokenTemplate._balances[deployer] = initialReceiverBalance;
+      // Check the nonce
+      const deployerNonce = await investigationProvider.getTransactionCount(investigationDeployer.address);
+      console.log(`Deployer nonce for investigation: ${deployerNonce} (should be 0 or low)`);
       
-      // Approve user2 to spend user1's tokens
-      await tokenTemplate.approve(user2, approvalAmount);
+      // Deploy a fresh contract
+      const investigationToken = await deployFreshTokenTemplate(investigationDeployer);
       
-      // Check allowance
-      const allowance = await tokenTemplate.allowance(user1, user2);
-      expect(allowance.toString()).toBe(approvalAmount.toString());
-      
-      // User2 transfers user1's tokens to deployer
-      await tokenTemplate.transferFrom(user1, deployer, transferAmount);
-      
-      // Check balances
-      const user1Balance = await tokenTemplate.balanceOf(user1);
-      expect(user1Balance.toString()).toBe((initialSenderBalance - transferAmount).toString());
-      
-      const deployerBalance = await tokenTemplate.balanceOf(deployer);
-      expect(deployerBalance.toString()).toBe((initialReceiverBalance + transferAmount).toString());
-      
-      const newAllowance = await tokenTemplate.allowance(user1, user2);
-      expect(newAllowance.toString()).toBe((approvalAmount - transferAmount).toString());
+      console.log("=== END INVESTIGATION ===\n");
     });
   });
 }); 

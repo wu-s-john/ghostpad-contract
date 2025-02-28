@@ -3,32 +3,29 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumber,
   BigNumberish,
   BytesLike,
-  CallOverrides,
-  ContractTransaction,
-  Overrides,
-  PopulatedTransaction,
-  Signer,
-  utils,
-} from "ethers";
-import type {
   FunctionFragment,
   Result,
+  Interface,
   EventFragment,
-} from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
+  AddressLike,
+  ContractRunner,
+  ContractMethod,
+  Listener,
+} from "ethers";
 import type {
-  TypedEventFilter,
-  TypedEvent,
+  TypedContractEvent,
+  TypedDeferredTopicFilter,
+  TypedEventLog,
+  TypedLogDescription,
   TypedListener,
-  OnEvent,
+  TypedContractMethod,
 } from "./common";
 
 export declare namespace TokenTemplate {
   export type VestingScheduleStruct = {
-    beneficiary: string;
+    beneficiary: AddressLike;
     cliff: BigNumberish;
     start: BigNumberish;
     duration: BigNumberish;
@@ -39,81 +36,36 @@ export declare namespace TokenTemplate {
   };
 
   export type VestingScheduleStructOutput = [
-    string,
-    BigNumber,
-    BigNumber,
-    BigNumber,
-    BigNumber,
-    BigNumber,
-    boolean,
-    boolean
+    beneficiary: string,
+    cliff: bigint,
+    start: bigint,
+    duration: bigint,
+    releasedAmount: bigint,
+    amountTotal: bigint,
+    revocable: boolean,
+    revoked: boolean
   ] & {
     beneficiary: string;
-    cliff: BigNumber;
-    start: BigNumber;
-    duration: BigNumber;
-    releasedAmount: BigNumber;
-    amountTotal: BigNumber;
+    cliff: bigint;
+    start: bigint;
+    duration: bigint;
+    releasedAmount: bigint;
+    amountTotal: bigint;
     revocable: boolean;
     revoked: boolean;
   };
 }
 
-export interface TokenTemplateInterface extends utils.Interface {
-  functions: {
-    "allowance(address,address)": FunctionFragment;
-    "approve(address,uint256)": FunctionFragment;
-    "balanceOf(address)": FunctionFragment;
-    "burn(uint256)": FunctionFragment;
-    "burnEnabled()": FunctionFragment;
-    "burnFrom(address,uint256)": FunctionFragment;
-    "computeReleasableAmount(bytes32)": FunctionFragment;
-    "computeVestingScheduleIdForAddressAndIndex(address,uint256)": FunctionFragment;
-    "contractLocked()": FunctionFragment;
-    "createVestingSchedule(address,uint256,uint256,uint256,bool,uint256)": FunctionFragment;
-    "decimals()": FunctionFragment;
-    "decreaseAllowance(address,uint256)": FunctionFragment;
-    "description()": FunctionFragment;
-    "getVestingSchedule(bytes32)": FunctionFragment;
-    "getVestingSchedulesCount()": FunctionFragment;
-    "getVestingSchedulesTotalAmount()": FunctionFragment;
-    "increaseAllowance(address,uint256)": FunctionFragment;
-    "initialize(string,string,uint256,address,string,uint256,address,bool,uint256,bool)": FunctionFragment;
-    "liquidityLockEndTime()": FunctionFragment;
-    "liquidityLockPeriod()": FunctionFragment;
-    "liquidityPool()": FunctionFragment;
-    "lockContract()": FunctionFragment;
-    "lockLiquidity(address)": FunctionFragment;
-    "mint(address,uint256)": FunctionFragment;
-    "name()": FunctionFragment;
-    "owner()": FunctionFragment;
-    "release(bytes32,uint256)": FunctionFragment;
-    "renounceOwnership()": FunctionFragment;
-    "revoke(bytes32)": FunctionFragment;
-    "setBurnEnabled(bool)": FunctionFragment;
-    "symbol()": FunctionFragment;
-    "taxRate()": FunctionFragment;
-    "taxRecipient()": FunctionFragment;
-    "totalSupply()": FunctionFragment;
-    "transfer(address,uint256)": FunctionFragment;
-    "transferFrom(address,address,uint256)": FunctionFragment;
-    "transferOwnership(address)": FunctionFragment;
-    "unlockLiquidity()": FunctionFragment;
-    "updateDescription(string)": FunctionFragment;
-    "updateTaxRate(uint256)": FunctionFragment;
-    "updateTaxRecipient(address)": FunctionFragment;
-    "vestingEnabled()": FunctionFragment;
-    "withdrawToken(address,uint256)": FunctionFragment;
-  };
-
+export interface TokenTemplateInterface extends Interface {
   getFunction(
-    nameOrSignatureOrTopic:
+    nameOrSignature:
       | "allowance"
       | "approve"
       | "balanceOf"
       | "burn"
       | "burnEnabled"
       | "burnFrom"
+      | "calculateOwnerPercentage"
       | "computeReleasableAmount"
       | "computeVestingScheduleIdForAddressAndIndex"
       | "contractLocked"
@@ -121,6 +73,7 @@ export interface TokenTemplateInterface extends utils.Interface {
       | "decimals"
       | "decreaseAllowance"
       | "description"
+      | "getTornadoDenomination"
       | "getVestingSchedule"
       | "getVestingSchedulesCount"
       | "getVestingSchedulesTotalAmount"
@@ -153,15 +106,37 @@ export interface TokenTemplateInterface extends utils.Interface {
       | "withdrawToken"
   ): FunctionFragment;
 
+  getEvent(
+    nameOrSignatureOrTopic:
+      | "Approval"
+      | "BurnEnabledUpdated"
+      | "ContractLocked"
+      | "DescriptionUpdated"
+      | "Initialized"
+      | "LiquidityLocked"
+      | "LiquidityUnlocked"
+      | "OwnershipTransferred"
+      | "TaxRateUpdated"
+      | "TaxRecipientUpdated"
+      | "TokenDistribution"
+      | "Transfer"
+      | "VestingReleased"
+      | "VestingScheduleCreated"
+      | "VestingScheduleRevoked"
+  ): EventFragment;
+
   encodeFunctionData(
     functionFragment: "allowance",
-    values: [string, string]
+    values: [AddressLike, AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "approve",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
-  encodeFunctionData(functionFragment: "balanceOf", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "balanceOf",
+    values: [AddressLike]
+  ): string;
   encodeFunctionData(functionFragment: "burn", values: [BigNumberish]): string;
   encodeFunctionData(
     functionFragment: "burnEnabled",
@@ -169,7 +144,11 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "burnFrom",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "calculateOwnerPercentage",
+    values: [BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "computeReleasableAmount",
@@ -177,7 +156,7 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "computeVestingScheduleIdForAddressAndIndex",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "contractLocked",
@@ -186,7 +165,7 @@ export interface TokenTemplateInterface extends utils.Interface {
   encodeFunctionData(
     functionFragment: "createVestingSchedule",
     values: [
-      string,
+      AddressLike,
       BigNumberish,
       BigNumberish,
       BigNumberish,
@@ -197,11 +176,15 @@ export interface TokenTemplateInterface extends utils.Interface {
   encodeFunctionData(functionFragment: "decimals", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "decreaseAllowance",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "description",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getTornadoDenomination",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getVestingSchedule",
@@ -217,7 +200,7 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "increaseAllowance",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "initialize",
@@ -225,10 +208,10 @@ export interface TokenTemplateInterface extends utils.Interface {
       string,
       string,
       BigNumberish,
-      string,
+      AddressLike,
       string,
       BigNumberish,
-      string,
+      AddressLike,
       boolean,
       BigNumberish,
       boolean
@@ -252,11 +235,11 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "lockLiquidity",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "mint",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(functionFragment: "name", values?: undefined): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
@@ -285,15 +268,15 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "transfer",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "transferFrom",
-    values: [string, string, BigNumberish]
+    values: [AddressLike, AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "transferOwnership",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "unlockLiquidity",
@@ -309,7 +292,7 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "updateTaxRecipient",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "vestingEnabled",
@@ -317,7 +300,7 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "withdrawToken",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
 
   decodeFunctionResult(functionFragment: "allowance", data: BytesLike): Result;
@@ -329,6 +312,10 @@ export interface TokenTemplateInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "burnFrom", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "calculateOwnerPercentage",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "computeReleasableAmount",
     data: BytesLike
@@ -352,6 +339,10 @@ export interface TokenTemplateInterface extends utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "description",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "getTornadoDenomination",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -447,1297 +438,981 @@ export interface TokenTemplateInterface extends utils.Interface {
     functionFragment: "withdrawToken",
     data: BytesLike
   ): Result;
-
-  events: {
-    "Approval(address,address,uint256)": EventFragment;
-    "BurnEnabledUpdated(bool)": EventFragment;
-    "ContractLocked(bool)": EventFragment;
-    "DescriptionUpdated(string,string)": EventFragment;
-    "Initialized(string,string,uint256,address)": EventFragment;
-    "LiquidityLocked(address,uint256)": EventFragment;
-    "LiquidityUnlocked(address)": EventFragment;
-    "OwnershipTransferred(address,address)": EventFragment;
-    "TaxRateUpdated(uint256,uint256)": EventFragment;
-    "TaxRecipientUpdated(address,address)": EventFragment;
-    "Transfer(address,address,uint256)": EventFragment;
-    "VestingReleased(bytes32,uint256)": EventFragment;
-    "VestingScheduleCreated(address,uint256,uint256,uint256,uint256,bool)": EventFragment;
-    "VestingScheduleRevoked(bytes32)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "Approval"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "BurnEnabledUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "ContractLocked"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "DescriptionUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Initialized"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "LiquidityLocked"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "LiquidityUnlocked"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "TaxRateUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "TaxRecipientUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "Transfer"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "VestingReleased"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "VestingScheduleCreated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "VestingScheduleRevoked"): EventFragment;
 }
 
-export interface ApprovalEventObject {
-  owner: string;
-  spender: string;
-  value: BigNumber;
+export namespace ApprovalEvent {
+  export type InputTuple = [
+    owner: AddressLike,
+    spender: AddressLike,
+    value: BigNumberish
+  ];
+  export type OutputTuple = [owner: string, spender: string, value: bigint];
+  export interface OutputObject {
+    owner: string;
+    spender: string;
+    value: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type ApprovalEvent = TypedEvent<
-  [string, string, BigNumber],
-  ApprovalEventObject
->;
 
-export type ApprovalEventFilter = TypedEventFilter<ApprovalEvent>;
-
-export interface BurnEnabledUpdatedEventObject {
-  enabled: boolean;
+export namespace BurnEnabledUpdatedEvent {
+  export type InputTuple = [enabled: boolean];
+  export type OutputTuple = [enabled: boolean];
+  export interface OutputObject {
+    enabled: boolean;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type BurnEnabledUpdatedEvent = TypedEvent<
-  [boolean],
-  BurnEnabledUpdatedEventObject
->;
 
-export type BurnEnabledUpdatedEventFilter =
-  TypedEventFilter<BurnEnabledUpdatedEvent>;
-
-export interface ContractLockedEventObject {
-  locked: boolean;
+export namespace ContractLockedEvent {
+  export type InputTuple = [locked: boolean];
+  export type OutputTuple = [locked: boolean];
+  export interface OutputObject {
+    locked: boolean;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type ContractLockedEvent = TypedEvent<
-  [boolean],
-  ContractLockedEventObject
->;
 
-export type ContractLockedEventFilter = TypedEventFilter<ContractLockedEvent>;
-
-export interface DescriptionUpdatedEventObject {
-  oldDescription: string;
-  newDescription: string;
+export namespace DescriptionUpdatedEvent {
+  export type InputTuple = [oldDescription: string, newDescription: string];
+  export type OutputTuple = [oldDescription: string, newDescription: string];
+  export interface OutputObject {
+    oldDescription: string;
+    newDescription: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type DescriptionUpdatedEvent = TypedEvent<
-  [string, string],
-  DescriptionUpdatedEventObject
->;
 
-export type DescriptionUpdatedEventFilter =
-  TypedEventFilter<DescriptionUpdatedEvent>;
-
-export interface InitializedEventObject {
-  name: string;
-  symbol: string;
-  initialSupply: BigNumber;
-  owner: string;
-}
-export type InitializedEvent = TypedEvent<
-  [string, string, BigNumber, string],
-  InitializedEventObject
->;
-
-export type InitializedEventFilter = TypedEventFilter<InitializedEvent>;
-
-export interface LiquidityLockedEventObject {
-  liquidityPool: string;
-  unlockTime: BigNumber;
-}
-export type LiquidityLockedEvent = TypedEvent<
-  [string, BigNumber],
-  LiquidityLockedEventObject
->;
-
-export type LiquidityLockedEventFilter = TypedEventFilter<LiquidityLockedEvent>;
-
-export interface LiquidityUnlockedEventObject {
-  liquidityPool: string;
-}
-export type LiquidityUnlockedEvent = TypedEvent<
-  [string],
-  LiquidityUnlockedEventObject
->;
-
-export type LiquidityUnlockedEventFilter =
-  TypedEventFilter<LiquidityUnlockedEvent>;
-
-export interface OwnershipTransferredEventObject {
-  previousOwner: string;
-  newOwner: string;
-}
-export type OwnershipTransferredEvent = TypedEvent<
-  [string, string],
-  OwnershipTransferredEventObject
->;
-
-export type OwnershipTransferredEventFilter =
-  TypedEventFilter<OwnershipTransferredEvent>;
-
-export interface TaxRateUpdatedEventObject {
-  oldRate: BigNumber;
-  newRate: BigNumber;
-}
-export type TaxRateUpdatedEvent = TypedEvent<
-  [BigNumber, BigNumber],
-  TaxRateUpdatedEventObject
->;
-
-export type TaxRateUpdatedEventFilter = TypedEventFilter<TaxRateUpdatedEvent>;
-
-export interface TaxRecipientUpdatedEventObject {
-  oldRecipient: string;
-  newRecipient: string;
-}
-export type TaxRecipientUpdatedEvent = TypedEvent<
-  [string, string],
-  TaxRecipientUpdatedEventObject
->;
-
-export type TaxRecipientUpdatedEventFilter =
-  TypedEventFilter<TaxRecipientUpdatedEvent>;
-
-export interface TransferEventObject {
-  from: string;
-  to: string;
-  value: BigNumber;
-}
-export type TransferEvent = TypedEvent<
-  [string, string, BigNumber],
-  TransferEventObject
->;
-
-export type TransferEventFilter = TypedEventFilter<TransferEvent>;
-
-export interface VestingReleasedEventObject {
-  vestingScheduleId: string;
-  amount: BigNumber;
-}
-export type VestingReleasedEvent = TypedEvent<
-  [string, BigNumber],
-  VestingReleasedEventObject
->;
-
-export type VestingReleasedEventFilter = TypedEventFilter<VestingReleasedEvent>;
-
-export interface VestingScheduleCreatedEventObject {
-  beneficiary: string;
-  amount: BigNumber;
-  start: BigNumber;
-  cliff: BigNumber;
-  duration: BigNumber;
-  revocable: boolean;
-}
-export type VestingScheduleCreatedEvent = TypedEvent<
-  [string, BigNumber, BigNumber, BigNumber, BigNumber, boolean],
-  VestingScheduleCreatedEventObject
->;
-
-export type VestingScheduleCreatedEventFilter =
-  TypedEventFilter<VestingScheduleCreatedEvent>;
-
-export interface VestingScheduleRevokedEventObject {
-  vestingScheduleId: string;
-}
-export type VestingScheduleRevokedEvent = TypedEvent<
-  [string],
-  VestingScheduleRevokedEventObject
->;
-
-export type VestingScheduleRevokedEventFilter =
-  TypedEventFilter<VestingScheduleRevokedEvent>;
-
-export interface TokenTemplate extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
-
-  interface: TokenTemplateInterface;
-
-  queryFilter<TEvent extends TypedEvent>(
-    event: TypedEventFilter<TEvent>,
-    fromBlockOrBlockhash?: string | number | undefined,
-    toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
-
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
-
-  functions: {
-    allowance(
-      owner: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<[BigNumber]>;
-
-    approve(
-      spender: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    balanceOf(account: string, overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    burn(
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    burnEnabled(overrides?: CallOverrides): Promise<[boolean]>;
-
-    burnFrom(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    computeReleasableAmount(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[BigNumber]>;
-
-    computeVestingScheduleIdForAddressAndIndex(
-      holder: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<[string]>;
-
-    contractLocked(overrides?: CallOverrides): Promise<[boolean]>;
-
-    createVestingSchedule(
-      _beneficiary: string,
-      _start: BigNumberish,
-      _cliff: BigNumberish,
-      _duration: BigNumberish,
-      _revocable: boolean,
-      _amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    decimals(overrides?: CallOverrides): Promise<[number]>;
-
-    decreaseAllowance(
-      spender: string,
-      subtractedValue: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    description(overrides?: CallOverrides): Promise<[string]>;
-
-    getVestingSchedule(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[TokenTemplate.VestingScheduleStructOutput]>;
-
-    getVestingSchedulesCount(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    getVestingSchedulesTotalAmount(
-      overrides?: CallOverrides
-    ): Promise<[BigNumber]>;
-
-    increaseAllowance(
-      spender: string,
-      addedValue: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    initialize(
-      name: string,
-      symbol: string,
-      initialSupply: BigNumberish,
-      owner: string,
-      _description: string,
-      _taxRate: BigNumberish,
-      _taxRecipient: string,
-      _burnEnabled: boolean,
-      _liquidityLockPeriod: BigNumberish,
-      _vestingEnabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    liquidityLockEndTime(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    liquidityLockPeriod(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    liquidityPool(overrides?: CallOverrides): Promise<[string]>;
-
-    lockContract(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    lockLiquidity(
-      _liquidityPool: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    mint(
-      to: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    name(overrides?: CallOverrides): Promise<[string]>;
-
-    owner(overrides?: CallOverrides): Promise<[string]>;
-
-    release(
-      vestingScheduleId: BytesLike,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    revoke(
-      vestingScheduleId: BytesLike,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    setBurnEnabled(
-      enabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    symbol(overrides?: CallOverrides): Promise<[string]>;
-
-    taxRate(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    taxRecipient(overrides?: CallOverrides): Promise<[string]>;
-
-    totalSupply(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    transfer(
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    transferFrom(
-      sender: string,
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    unlockLiquidity(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    updateDescription(
-      newDescription: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    updateTaxRate(
-      newTaxRate: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    updateTaxRecipient(
-      newTaxRecipient: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    vestingEnabled(overrides?: CallOverrides): Promise<[boolean]>;
-
-    withdrawToken(
-      token: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-  };
-
-  allowance(
-    owner: string,
-    spender: string,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
-
-  approve(
-    spender: string,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  balanceOf(account: string, overrides?: CallOverrides): Promise<BigNumber>;
-
-  burn(
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  burnEnabled(overrides?: CallOverrides): Promise<boolean>;
-
-  burnFrom(
-    account: string,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  computeReleasableAmount(
-    vestingScheduleId: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<BigNumber>;
-
-  computeVestingScheduleIdForAddressAndIndex(
-    holder: string,
-    index: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<string>;
-
-  contractLocked(overrides?: CallOverrides): Promise<boolean>;
-
-  createVestingSchedule(
-    _beneficiary: string,
-    _start: BigNumberish,
-    _cliff: BigNumberish,
-    _duration: BigNumberish,
-    _revocable: boolean,
-    _amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  decimals(overrides?: CallOverrides): Promise<number>;
-
-  decreaseAllowance(
-    spender: string,
-    subtractedValue: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  description(overrides?: CallOverrides): Promise<string>;
-
-  getVestingSchedule(
-    vestingScheduleId: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<TokenTemplate.VestingScheduleStructOutput>;
-
-  getVestingSchedulesCount(overrides?: CallOverrides): Promise<BigNumber>;
-
-  getVestingSchedulesTotalAmount(overrides?: CallOverrides): Promise<BigNumber>;
-
-  increaseAllowance(
-    spender: string,
-    addedValue: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  initialize(
+export namespace InitializedEvent {
+  export type InputTuple = [
     name: string,
     symbol: string,
     initialSupply: BigNumberish,
-    owner: string,
-    _description: string,
-    _taxRate: BigNumberish,
-    _taxRecipient: string,
-    _burnEnabled: boolean,
-    _liquidityLockPeriod: BigNumberish,
-    _vestingEnabled: boolean,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+    owner: AddressLike
+  ];
+  export type OutputTuple = [
+    name: string,
+    symbol: string,
+    initialSupply: bigint,
+    owner: string
+  ];
+  export interface OutputObject {
+    name: string;
+    symbol: string;
+    initialSupply: bigint;
+    owner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  liquidityLockEndTime(overrides?: CallOverrides): Promise<BigNumber>;
+export namespace LiquidityLockedEvent {
+  export type InputTuple = [
+    liquidityPool: AddressLike,
+    unlockTime: BigNumberish
+  ];
+  export type OutputTuple = [liquidityPool: string, unlockTime: bigint];
+  export interface OutputObject {
+    liquidityPool: string;
+    unlockTime: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  liquidityLockPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+export namespace LiquidityUnlockedEvent {
+  export type InputTuple = [liquidityPool: AddressLike];
+  export type OutputTuple = [liquidityPool: string];
+  export interface OutputObject {
+    liquidityPool: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  liquidityPool(overrides?: CallOverrides): Promise<string>;
+export namespace OwnershipTransferredEvent {
+  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
+  export type OutputTuple = [previousOwner: string, newOwner: string];
+  export interface OutputObject {
+    previousOwner: string;
+    newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  lockContract(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+export namespace TaxRateUpdatedEvent {
+  export type InputTuple = [oldRate: BigNumberish, newRate: BigNumberish];
+  export type OutputTuple = [oldRate: bigint, newRate: bigint];
+  export interface OutputObject {
+    oldRate: bigint;
+    newRate: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  lockLiquidity(
-    _liquidityPool: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+export namespace TaxRecipientUpdatedEvent {
+  export type InputTuple = [
+    oldRecipient: AddressLike,
+    newRecipient: AddressLike
+  ];
+  export type OutputTuple = [oldRecipient: string, newRecipient: string];
+  export interface OutputObject {
+    oldRecipient: string;
+    newRecipient: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  mint(
-    to: string,
+export namespace TokenDistributionEvent {
+  export type InputTuple = [
+    ownerAmount: BigNumberish,
+    contractAmount: BigNumberish,
+    ownerPercentage: BigNumberish
+  ];
+  export type OutputTuple = [
+    ownerAmount: bigint,
+    contractAmount: bigint,
+    ownerPercentage: bigint
+  ];
+  export interface OutputObject {
+    ownerAmount: bigint;
+    contractAmount: bigint;
+    ownerPercentage: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace TransferEvent {
+  export type InputTuple = [
+    from: AddressLike,
+    to: AddressLike,
+    value: BigNumberish
+  ];
+  export type OutputTuple = [from: string, to: string, value: bigint];
+  export interface OutputObject {
+    from: string;
+    to: string;
+    value: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace VestingReleasedEvent {
+  export type InputTuple = [vestingScheduleId: BytesLike, amount: BigNumberish];
+  export type OutputTuple = [vestingScheduleId: string, amount: bigint];
+  export interface OutputObject {
+    vestingScheduleId: string;
+    amount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace VestingScheduleCreatedEvent {
+  export type InputTuple = [
+    beneficiary: AddressLike,
     amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+    start: BigNumberish,
+    cliff: BigNumberish,
+    duration: BigNumberish,
+    revocable: boolean
+  ];
+  export type OutputTuple = [
+    beneficiary: string,
+    amount: bigint,
+    start: bigint,
+    cliff: bigint,
+    duration: bigint,
+    revocable: boolean
+  ];
+  export interface OutputObject {
+    beneficiary: string;
+    amount: bigint;
+    start: bigint;
+    cliff: bigint;
+    duration: bigint;
+    revocable: boolean;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  name(overrides?: CallOverrides): Promise<string>;
+export namespace VestingScheduleRevokedEvent {
+  export type InputTuple = [vestingScheduleId: BytesLike];
+  export type OutputTuple = [vestingScheduleId: string];
+  export interface OutputObject {
+    vestingScheduleId: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
 
-  owner(overrides?: CallOverrides): Promise<string>;
+export interface TokenTemplate extends BaseContract {
+  connect(runner?: ContractRunner | null): TokenTemplate;
+  waitForDeployment(): Promise<this>;
 
-  release(
-    vestingScheduleId: BytesLike,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  interface: TokenTemplateInterface;
 
-  renounceOwnership(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
 
-  revoke(
-    vestingScheduleId: BytesLike,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  on<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  on<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  setBurnEnabled(
-    enabled: boolean,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  once<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  once<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  symbol(overrides?: CallOverrides): Promise<string>;
+  listeners<TCEvent extends TypedContractEvent>(
+    event: TCEvent
+  ): Promise<Array<TypedListener<TCEvent>>>;
+  listeners(eventName?: string): Promise<Array<Listener>>;
+  removeAllListeners<TCEvent extends TypedContractEvent>(
+    event?: TCEvent
+  ): Promise<this>;
 
-  taxRate(overrides?: CallOverrides): Promise<BigNumber>;
+  allowance: TypedContractMethod<
+    [owner: AddressLike, spender: AddressLike],
+    [bigint],
+    "view"
+  >;
 
-  taxRecipient(overrides?: CallOverrides): Promise<string>;
+  approve: TypedContractMethod<
+    [spender: AddressLike, amount: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
 
-  totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+  balanceOf: TypedContractMethod<[account: AddressLike], [bigint], "view">;
 
-  transfer(
-    recipient: string,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  burn: TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
 
-  transferFrom(
-    sender: string,
-    recipient: string,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  burnEnabled: TypedContractMethod<[], [boolean], "view">;
 
-  transferOwnership(
-    newOwner: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  burnFrom: TypedContractMethod<
+    [account: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-  unlockLiquidity(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  calculateOwnerPercentage: TypedContractMethod<
+    [ethAmount: BigNumberish],
+    [bigint],
+    "view"
+  >;
 
-  updateDescription(
-    newDescription: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  computeReleasableAmount: TypedContractMethod<
+    [vestingScheduleId: BytesLike],
+    [bigint],
+    "view"
+  >;
 
-  updateTaxRate(
-    newTaxRate: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  computeVestingScheduleIdForAddressAndIndex: TypedContractMethod<
+    [holder: AddressLike, index: BigNumberish],
+    [string],
+    "view"
+  >;
 
-  updateTaxRecipient(
-    newTaxRecipient: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  contractLocked: TypedContractMethod<[], [boolean], "view">;
 
-  vestingEnabled(overrides?: CallOverrides): Promise<boolean>;
-
-  withdrawToken(
-    token: string,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  callStatic: {
-    allowance(
-      owner: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    approve(
-      spender: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    balanceOf(account: string, overrides?: CallOverrides): Promise<BigNumber>;
-
-    burn(amount: BigNumberish, overrides?: CallOverrides): Promise<void>;
-
-    burnEnabled(overrides?: CallOverrides): Promise<boolean>;
-
-    burnFrom(
-      account: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    computeReleasableAmount(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    computeVestingScheduleIdForAddressAndIndex(
-      holder: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<string>;
-
-    contractLocked(overrides?: CallOverrides): Promise<boolean>;
-
-    createVestingSchedule(
-      _beneficiary: string,
+  createVestingSchedule: TypedContractMethod<
+    [
+      _beneficiary: AddressLike,
       _start: BigNumberish,
       _cliff: BigNumberish,
       _duration: BigNumberish,
       _revocable: boolean,
-      _amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+      _amount: BigNumberish
+    ],
+    [void],
+    "nonpayable"
+  >;
 
-    decimals(overrides?: CallOverrides): Promise<number>;
+  decimals: TypedContractMethod<[], [bigint], "view">;
 
-    decreaseAllowance(
-      spender: string,
-      subtractedValue: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+  decreaseAllowance: TypedContractMethod<
+    [spender: AddressLike, subtractedValue: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
 
-    description(overrides?: CallOverrides): Promise<string>;
+  description: TypedContractMethod<[], [string], "view">;
 
-    getVestingSchedule(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<TokenTemplate.VestingScheduleStructOutput>;
+  getTornadoDenomination: TypedContractMethod<
+    [ghostPadAddress: AddressLike],
+    [bigint],
+    "view"
+  >;
 
-    getVestingSchedulesCount(overrides?: CallOverrides): Promise<BigNumber>;
+  getVestingSchedule: TypedContractMethod<
+    [vestingScheduleId: BytesLike],
+    [TokenTemplate.VestingScheduleStructOutput],
+    "view"
+  >;
 
-    getVestingSchedulesTotalAmount(
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
+  getVestingSchedulesCount: TypedContractMethod<[], [bigint], "view">;
 
-    increaseAllowance(
-      spender: string,
-      addedValue: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+  getVestingSchedulesTotalAmount: TypedContractMethod<[], [bigint], "view">;
 
-    initialize(
+  increaseAllowance: TypedContractMethod<
+    [spender: AddressLike, addedValue: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
+
+  initialize: TypedContractMethod<
+    [
       name: string,
       symbol: string,
       initialSupply: BigNumberish,
-      owner: string,
+      owner: AddressLike,
       _description: string,
       _taxRate: BigNumberish,
-      _taxRecipient: string,
+      _taxRecipient: AddressLike,
       _burnEnabled: boolean,
       _liquidityLockPeriod: BigNumberish,
-      _vestingEnabled: boolean,
-      overrides?: CallOverrides
-    ): Promise<void>;
+      _vestingEnabled: boolean
+    ],
+    [void],
+    "nonpayable"
+  >;
 
-    liquidityLockEndTime(overrides?: CallOverrides): Promise<BigNumber>;
+  liquidityLockEndTime: TypedContractMethod<[], [bigint], "view">;
 
-    liquidityLockPeriod(overrides?: CallOverrides): Promise<BigNumber>;
+  liquidityLockPeriod: TypedContractMethod<[], [bigint], "view">;
 
-    liquidityPool(overrides?: CallOverrides): Promise<string>;
+  liquidityPool: TypedContractMethod<[], [string], "view">;
 
-    lockContract(overrides?: CallOverrides): Promise<void>;
+  lockContract: TypedContractMethod<[], [void], "nonpayable">;
 
-    lockLiquidity(
-      _liquidityPool: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  lockLiquidity: TypedContractMethod<
+    [_liquidityPool: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-    mint(
-      to: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  mint: TypedContractMethod<
+    [to: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-    name(overrides?: CallOverrides): Promise<string>;
+  name: TypedContractMethod<[], [string], "view">;
 
-    owner(overrides?: CallOverrides): Promise<string>;
+  owner: TypedContractMethod<[], [string], "view">;
 
-    release(
-      vestingScheduleId: BytesLike,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  release: TypedContractMethod<
+    [vestingScheduleId: BytesLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-    renounceOwnership(overrides?: CallOverrides): Promise<void>;
+  renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
-    revoke(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  revoke: TypedContractMethod<
+    [vestingScheduleId: BytesLike],
+    [void],
+    "nonpayable"
+  >;
 
-    setBurnEnabled(enabled: boolean, overrides?: CallOverrides): Promise<void>;
+  setBurnEnabled: TypedContractMethod<[enabled: boolean], [void], "nonpayable">;
 
-    symbol(overrides?: CallOverrides): Promise<string>;
+  symbol: TypedContractMethod<[], [string], "view">;
 
-    taxRate(overrides?: CallOverrides): Promise<BigNumber>;
+  taxRate: TypedContractMethod<[], [bigint], "view">;
 
-    taxRecipient(overrides?: CallOverrides): Promise<string>;
+  taxRecipient: TypedContractMethod<[], [string], "view">;
 
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
+  totalSupply: TypedContractMethod<[], [bigint], "view">;
 
-    transfer(
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+  transfer: TypedContractMethod<
+    [recipient: AddressLike, amount: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
 
-    transferFrom(
-      sender: string,
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+  transferFrom: TypedContractMethod<
+    [sender: AddressLike, recipient: AddressLike, amount: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
 
-    transferOwnership(
-      newOwner: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  transferOwnership: TypedContractMethod<
+    [newOwner: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-    unlockLiquidity(overrides?: CallOverrides): Promise<void>;
+  unlockLiquidity: TypedContractMethod<[], [void], "nonpayable">;
 
-    updateDescription(
-      newDescription: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  updateDescription: TypedContractMethod<
+    [newDescription: string],
+    [void],
+    "nonpayable"
+  >;
 
-    updateTaxRate(
-      newTaxRate: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  updateTaxRate: TypedContractMethod<
+    [newTaxRate: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-    updateTaxRecipient(
-      newTaxRecipient: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  updateTaxRecipient: TypedContractMethod<
+    [newTaxRecipient: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-    vestingEnabled(overrides?: CallOverrides): Promise<boolean>;
+  vestingEnabled: TypedContractMethod<[], [boolean], "view">;
 
-    withdrawToken(
-      token: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-  };
+  withdrawToken: TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
+  getFunction<T extends ContractMethod = ContractMethod>(
+    key: string | FunctionFragment
+  ): T;
+
+  getFunction(
+    nameOrSignature: "allowance"
+  ): TypedContractMethod<
+    [owner: AddressLike, spender: AddressLike],
+    [bigint],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "approve"
+  ): TypedContractMethod<
+    [spender: AddressLike, amount: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "balanceOf"
+  ): TypedContractMethod<[account: AddressLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "burn"
+  ): TypedContractMethod<[amount: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "burnEnabled"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "burnFrom"
+  ): TypedContractMethod<
+    [account: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "calculateOwnerPercentage"
+  ): TypedContractMethod<[ethAmount: BigNumberish], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "computeReleasableAmount"
+  ): TypedContractMethod<[vestingScheduleId: BytesLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "computeVestingScheduleIdForAddressAndIndex"
+  ): TypedContractMethod<
+    [holder: AddressLike, index: BigNumberish],
+    [string],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "contractLocked"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "createVestingSchedule"
+  ): TypedContractMethod<
+    [
+      _beneficiary: AddressLike,
+      _start: BigNumberish,
+      _cliff: BigNumberish,
+      _duration: BigNumberish,
+      _revocable: boolean,
+      _amount: BigNumberish
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "decimals"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "decreaseAllowance"
+  ): TypedContractMethod<
+    [spender: AddressLike, subtractedValue: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "description"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "getTornadoDenomination"
+  ): TypedContractMethod<[ghostPadAddress: AddressLike], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "getVestingSchedule"
+  ): TypedContractMethod<
+    [vestingScheduleId: BytesLike],
+    [TokenTemplate.VestingScheduleStructOutput],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getVestingSchedulesCount"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "getVestingSchedulesTotalAmount"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "increaseAllowance"
+  ): TypedContractMethod<
+    [spender: AddressLike, addedValue: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "initialize"
+  ): TypedContractMethod<
+    [
+      name: string,
+      symbol: string,
+      initialSupply: BigNumberish,
+      owner: AddressLike,
+      _description: string,
+      _taxRate: BigNumberish,
+      _taxRecipient: AddressLike,
+      _burnEnabled: boolean,
+      _liquidityLockPeriod: BigNumberish,
+      _vestingEnabled: boolean
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "liquidityLockEndTime"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "liquidityLockPeriod"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "liquidityPool"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "lockContract"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "lockLiquidity"
+  ): TypedContractMethod<[_liquidityPool: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "mint"
+  ): TypedContractMethod<
+    [to: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "name"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "owner"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "release"
+  ): TypedContractMethod<
+    [vestingScheduleId: BytesLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "renounceOwnership"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "revoke"
+  ): TypedContractMethod<[vestingScheduleId: BytesLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "setBurnEnabled"
+  ): TypedContractMethod<[enabled: boolean], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "symbol"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "taxRate"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "taxRecipient"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "totalSupply"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "transfer"
+  ): TypedContractMethod<
+    [recipient: AddressLike, amount: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "transferFrom"
+  ): TypedContractMethod<
+    [sender: AddressLike, recipient: AddressLike, amount: BigNumberish],
+    [boolean],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "transferOwnership"
+  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "unlockLiquidity"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "updateDescription"
+  ): TypedContractMethod<[newDescription: string], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "updateTaxRate"
+  ): TypedContractMethod<[newTaxRate: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "updateTaxRecipient"
+  ): TypedContractMethod<[newTaxRecipient: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "vestingEnabled"
+  ): TypedContractMethod<[], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "withdrawToken"
+  ): TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+
+  getEvent(
+    key: "Approval"
+  ): TypedContractEvent<
+    ApprovalEvent.InputTuple,
+    ApprovalEvent.OutputTuple,
+    ApprovalEvent.OutputObject
+  >;
+  getEvent(
+    key: "BurnEnabledUpdated"
+  ): TypedContractEvent<
+    BurnEnabledUpdatedEvent.InputTuple,
+    BurnEnabledUpdatedEvent.OutputTuple,
+    BurnEnabledUpdatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "ContractLocked"
+  ): TypedContractEvent<
+    ContractLockedEvent.InputTuple,
+    ContractLockedEvent.OutputTuple,
+    ContractLockedEvent.OutputObject
+  >;
+  getEvent(
+    key: "DescriptionUpdated"
+  ): TypedContractEvent<
+    DescriptionUpdatedEvent.InputTuple,
+    DescriptionUpdatedEvent.OutputTuple,
+    DescriptionUpdatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "Initialized"
+  ): TypedContractEvent<
+    InitializedEvent.InputTuple,
+    InitializedEvent.OutputTuple,
+    InitializedEvent.OutputObject
+  >;
+  getEvent(
+    key: "LiquidityLocked"
+  ): TypedContractEvent<
+    LiquidityLockedEvent.InputTuple,
+    LiquidityLockedEvent.OutputTuple,
+    LiquidityLockedEvent.OutputObject
+  >;
+  getEvent(
+    key: "LiquidityUnlocked"
+  ): TypedContractEvent<
+    LiquidityUnlockedEvent.InputTuple,
+    LiquidityUnlockedEvent.OutputTuple,
+    LiquidityUnlockedEvent.OutputObject
+  >;
+  getEvent(
+    key: "OwnershipTransferred"
+  ): TypedContractEvent<
+    OwnershipTransferredEvent.InputTuple,
+    OwnershipTransferredEvent.OutputTuple,
+    OwnershipTransferredEvent.OutputObject
+  >;
+  getEvent(
+    key: "TaxRateUpdated"
+  ): TypedContractEvent<
+    TaxRateUpdatedEvent.InputTuple,
+    TaxRateUpdatedEvent.OutputTuple,
+    TaxRateUpdatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "TaxRecipientUpdated"
+  ): TypedContractEvent<
+    TaxRecipientUpdatedEvent.InputTuple,
+    TaxRecipientUpdatedEvent.OutputTuple,
+    TaxRecipientUpdatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "TokenDistribution"
+  ): TypedContractEvent<
+    TokenDistributionEvent.InputTuple,
+    TokenDistributionEvent.OutputTuple,
+    TokenDistributionEvent.OutputObject
+  >;
+  getEvent(
+    key: "Transfer"
+  ): TypedContractEvent<
+    TransferEvent.InputTuple,
+    TransferEvent.OutputTuple,
+    TransferEvent.OutputObject
+  >;
+  getEvent(
+    key: "VestingReleased"
+  ): TypedContractEvent<
+    VestingReleasedEvent.InputTuple,
+    VestingReleasedEvent.OutputTuple,
+    VestingReleasedEvent.OutputObject
+  >;
+  getEvent(
+    key: "VestingScheduleCreated"
+  ): TypedContractEvent<
+    VestingScheduleCreatedEvent.InputTuple,
+    VestingScheduleCreatedEvent.OutputTuple,
+    VestingScheduleCreatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "VestingScheduleRevoked"
+  ): TypedContractEvent<
+    VestingScheduleRevokedEvent.InputTuple,
+    VestingScheduleRevokedEvent.OutputTuple,
+    VestingScheduleRevokedEvent.OutputObject
+  >;
 
   filters: {
-    "Approval(address,address,uint256)"(
-      owner?: string | null,
-      spender?: string | null,
-      value?: null
-    ): ApprovalEventFilter;
-    Approval(
-      owner?: string | null,
-      spender?: string | null,
-      value?: null
-    ): ApprovalEventFilter;
-
-    "BurnEnabledUpdated(bool)"(enabled?: null): BurnEnabledUpdatedEventFilter;
-    BurnEnabledUpdated(enabled?: null): BurnEnabledUpdatedEventFilter;
-
-    "ContractLocked(bool)"(locked?: null): ContractLockedEventFilter;
-    ContractLocked(locked?: null): ContractLockedEventFilter;
-
-    "DescriptionUpdated(string,string)"(
-      oldDescription?: null,
-      newDescription?: null
-    ): DescriptionUpdatedEventFilter;
-    DescriptionUpdated(
-      oldDescription?: null,
-      newDescription?: null
-    ): DescriptionUpdatedEventFilter;
-
-    "Initialized(string,string,uint256,address)"(
-      name?: null,
-      symbol?: null,
-      initialSupply?: null,
-      owner?: null
-    ): InitializedEventFilter;
-    Initialized(
-      name?: null,
-      symbol?: null,
-      initialSupply?: null,
-      owner?: null
-    ): InitializedEventFilter;
-
-    "LiquidityLocked(address,uint256)"(
-      liquidityPool?: null,
-      unlockTime?: null
-    ): LiquidityLockedEventFilter;
-    LiquidityLocked(
-      liquidityPool?: null,
-      unlockTime?: null
-    ): LiquidityLockedEventFilter;
-
-    "LiquidityUnlocked(address)"(
-      liquidityPool?: null
-    ): LiquidityUnlockedEventFilter;
-    LiquidityUnlocked(liquidityPool?: null): LiquidityUnlockedEventFilter;
-
-    "OwnershipTransferred(address,address)"(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter;
-    OwnershipTransferred(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter;
-
-    "TaxRateUpdated(uint256,uint256)"(
-      oldRate?: null,
-      newRate?: null
-    ): TaxRateUpdatedEventFilter;
-    TaxRateUpdated(oldRate?: null, newRate?: null): TaxRateUpdatedEventFilter;
-
-    "TaxRecipientUpdated(address,address)"(
-      oldRecipient?: null,
-      newRecipient?: null
-    ): TaxRecipientUpdatedEventFilter;
-    TaxRecipientUpdated(
-      oldRecipient?: null,
-      newRecipient?: null
-    ): TaxRecipientUpdatedEventFilter;
-
-    "Transfer(address,address,uint256)"(
-      from?: string | null,
-      to?: string | null,
-      value?: null
-    ): TransferEventFilter;
-    Transfer(
-      from?: string | null,
-      to?: string | null,
-      value?: null
-    ): TransferEventFilter;
-
-    "VestingReleased(bytes32,uint256)"(
-      vestingScheduleId?: null,
-      amount?: null
-    ): VestingReleasedEventFilter;
-    VestingReleased(
-      vestingScheduleId?: null,
-      amount?: null
-    ): VestingReleasedEventFilter;
-
-    "VestingScheduleCreated(address,uint256,uint256,uint256,uint256,bool)"(
-      beneficiary?: null,
-      amount?: null,
-      start?: null,
-      cliff?: null,
-      duration?: null,
-      revocable?: null
-    ): VestingScheduleCreatedEventFilter;
-    VestingScheduleCreated(
-      beneficiary?: null,
-      amount?: null,
-      start?: null,
-      cliff?: null,
-      duration?: null,
-      revocable?: null
-    ): VestingScheduleCreatedEventFilter;
-
-    "VestingScheduleRevoked(bytes32)"(
-      vestingScheduleId?: null
-    ): VestingScheduleRevokedEventFilter;
-    VestingScheduleRevoked(
-      vestingScheduleId?: null
-    ): VestingScheduleRevokedEventFilter;
-  };
-
-  estimateGas: {
-    allowance(
-      owner: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    approve(
-      spender: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    balanceOf(account: string, overrides?: CallOverrides): Promise<BigNumber>;
-
-    burn(
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    burnEnabled(overrides?: CallOverrides): Promise<BigNumber>;
-
-    burnFrom(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    computeReleasableAmount(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    computeVestingScheduleIdForAddressAndIndex(
-      holder: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    contractLocked(overrides?: CallOverrides): Promise<BigNumber>;
-
-    createVestingSchedule(
-      _beneficiary: string,
-      _start: BigNumberish,
-      _cliff: BigNumberish,
-      _duration: BigNumberish,
-      _revocable: boolean,
-      _amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    decimals(overrides?: CallOverrides): Promise<BigNumber>;
-
-    decreaseAllowance(
-      spender: string,
-      subtractedValue: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    description(overrides?: CallOverrides): Promise<BigNumber>;
-
-    getVestingSchedule(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    getVestingSchedulesCount(overrides?: CallOverrides): Promise<BigNumber>;
-
-    getVestingSchedulesTotalAmount(
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    increaseAllowance(
-      spender: string,
-      addedValue: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    initialize(
-      name: string,
-      symbol: string,
-      initialSupply: BigNumberish,
-      owner: string,
-      _description: string,
-      _taxRate: BigNumberish,
-      _taxRecipient: string,
-      _burnEnabled: boolean,
-      _liquidityLockPeriod: BigNumberish,
-      _vestingEnabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    liquidityLockEndTime(overrides?: CallOverrides): Promise<BigNumber>;
-
-    liquidityLockPeriod(overrides?: CallOverrides): Promise<BigNumber>;
-
-    liquidityPool(overrides?: CallOverrides): Promise<BigNumber>;
-
-    lockContract(overrides?: Overrides & { from?: string }): Promise<BigNumber>;
-
-    lockLiquidity(
-      _liquidityPool: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    mint(
-      to: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    name(overrides?: CallOverrides): Promise<BigNumber>;
-
-    owner(overrides?: CallOverrides): Promise<BigNumber>;
-
-    release(
-      vestingScheduleId: BytesLike,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    revoke(
-      vestingScheduleId: BytesLike,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    setBurnEnabled(
-      enabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    symbol(overrides?: CallOverrides): Promise<BigNumber>;
-
-    taxRate(overrides?: CallOverrides): Promise<BigNumber>;
-
-    taxRecipient(overrides?: CallOverrides): Promise<BigNumber>;
-
-    totalSupply(overrides?: CallOverrides): Promise<BigNumber>;
-
-    transfer(
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    transferFrom(
-      sender: string,
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    unlockLiquidity(
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    updateDescription(
-      newDescription: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    updateTaxRate(
-      newTaxRate: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    updateTaxRecipient(
-      newTaxRecipient: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    vestingEnabled(overrides?: CallOverrides): Promise<BigNumber>;
-
-    withdrawToken(
-      token: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-  };
-
-  populateTransaction: {
-    allowance(
-      owner: string,
-      spender: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    approve(
-      spender: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    balanceOf(
-      account: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    burn(
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    burnEnabled(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    burnFrom(
-      account: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    computeReleasableAmount(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    computeVestingScheduleIdForAddressAndIndex(
-      holder: string,
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    contractLocked(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    createVestingSchedule(
-      _beneficiary: string,
-      _start: BigNumberish,
-      _cliff: BigNumberish,
-      _duration: BigNumberish,
-      _revocable: boolean,
-      _amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    decimals(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    decreaseAllowance(
-      spender: string,
-      subtractedValue: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    description(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    getVestingSchedule(
-      vestingScheduleId: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    getVestingSchedulesCount(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    getVestingSchedulesTotalAmount(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    increaseAllowance(
-      spender: string,
-      addedValue: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    initialize(
-      name: string,
-      symbol: string,
-      initialSupply: BigNumberish,
-      owner: string,
-      _description: string,
-      _taxRate: BigNumberish,
-      _taxRecipient: string,
-      _burnEnabled: boolean,
-      _liquidityLockPeriod: BigNumberish,
-      _vestingEnabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    liquidityLockEndTime(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    liquidityLockPeriod(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    liquidityPool(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    lockContract(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    lockLiquidity(
-      _liquidityPool: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    mint(
-      to: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    name(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    release(
-      vestingScheduleId: BytesLike,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    revoke(
-      vestingScheduleId: BytesLike,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    setBurnEnabled(
-      enabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    symbol(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    taxRate(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    taxRecipient(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    totalSupply(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    transfer(
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    transferFrom(
-      sender: string,
-      recipient: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    unlockLiquidity(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    updateDescription(
-      newDescription: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    updateTaxRate(
-      newTaxRate: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    updateTaxRecipient(
-      newTaxRecipient: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    vestingEnabled(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    withdrawToken(
-      token: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    "Approval(address,address,uint256)": TypedContractEvent<
+      ApprovalEvent.InputTuple,
+      ApprovalEvent.OutputTuple,
+      ApprovalEvent.OutputObject
+    >;
+    Approval: TypedContractEvent<
+      ApprovalEvent.InputTuple,
+      ApprovalEvent.OutputTuple,
+      ApprovalEvent.OutputObject
+    >;
+
+    "BurnEnabledUpdated(bool)": TypedContractEvent<
+      BurnEnabledUpdatedEvent.InputTuple,
+      BurnEnabledUpdatedEvent.OutputTuple,
+      BurnEnabledUpdatedEvent.OutputObject
+    >;
+    BurnEnabledUpdated: TypedContractEvent<
+      BurnEnabledUpdatedEvent.InputTuple,
+      BurnEnabledUpdatedEvent.OutputTuple,
+      BurnEnabledUpdatedEvent.OutputObject
+    >;
+
+    "ContractLocked(bool)": TypedContractEvent<
+      ContractLockedEvent.InputTuple,
+      ContractLockedEvent.OutputTuple,
+      ContractLockedEvent.OutputObject
+    >;
+    ContractLocked: TypedContractEvent<
+      ContractLockedEvent.InputTuple,
+      ContractLockedEvent.OutputTuple,
+      ContractLockedEvent.OutputObject
+    >;
+
+    "DescriptionUpdated(string,string)": TypedContractEvent<
+      DescriptionUpdatedEvent.InputTuple,
+      DescriptionUpdatedEvent.OutputTuple,
+      DescriptionUpdatedEvent.OutputObject
+    >;
+    DescriptionUpdated: TypedContractEvent<
+      DescriptionUpdatedEvent.InputTuple,
+      DescriptionUpdatedEvent.OutputTuple,
+      DescriptionUpdatedEvent.OutputObject
+    >;
+
+    "Initialized(string,string,uint256,address)": TypedContractEvent<
+      InitializedEvent.InputTuple,
+      InitializedEvent.OutputTuple,
+      InitializedEvent.OutputObject
+    >;
+    Initialized: TypedContractEvent<
+      InitializedEvent.InputTuple,
+      InitializedEvent.OutputTuple,
+      InitializedEvent.OutputObject
+    >;
+
+    "LiquidityLocked(address,uint256)": TypedContractEvent<
+      LiquidityLockedEvent.InputTuple,
+      LiquidityLockedEvent.OutputTuple,
+      LiquidityLockedEvent.OutputObject
+    >;
+    LiquidityLocked: TypedContractEvent<
+      LiquidityLockedEvent.InputTuple,
+      LiquidityLockedEvent.OutputTuple,
+      LiquidityLockedEvent.OutputObject
+    >;
+
+    "LiquidityUnlocked(address)": TypedContractEvent<
+      LiquidityUnlockedEvent.InputTuple,
+      LiquidityUnlockedEvent.OutputTuple,
+      LiquidityUnlockedEvent.OutputObject
+    >;
+    LiquidityUnlocked: TypedContractEvent<
+      LiquidityUnlockedEvent.InputTuple,
+      LiquidityUnlockedEvent.OutputTuple,
+      LiquidityUnlockedEvent.OutputObject
+    >;
+
+    "OwnershipTransferred(address,address)": TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
+    OwnershipTransferred: TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
+
+    "TaxRateUpdated(uint256,uint256)": TypedContractEvent<
+      TaxRateUpdatedEvent.InputTuple,
+      TaxRateUpdatedEvent.OutputTuple,
+      TaxRateUpdatedEvent.OutputObject
+    >;
+    TaxRateUpdated: TypedContractEvent<
+      TaxRateUpdatedEvent.InputTuple,
+      TaxRateUpdatedEvent.OutputTuple,
+      TaxRateUpdatedEvent.OutputObject
+    >;
+
+    "TaxRecipientUpdated(address,address)": TypedContractEvent<
+      TaxRecipientUpdatedEvent.InputTuple,
+      TaxRecipientUpdatedEvent.OutputTuple,
+      TaxRecipientUpdatedEvent.OutputObject
+    >;
+    TaxRecipientUpdated: TypedContractEvent<
+      TaxRecipientUpdatedEvent.InputTuple,
+      TaxRecipientUpdatedEvent.OutputTuple,
+      TaxRecipientUpdatedEvent.OutputObject
+    >;
+
+    "TokenDistribution(uint256,uint256,uint256)": TypedContractEvent<
+      TokenDistributionEvent.InputTuple,
+      TokenDistributionEvent.OutputTuple,
+      TokenDistributionEvent.OutputObject
+    >;
+    TokenDistribution: TypedContractEvent<
+      TokenDistributionEvent.InputTuple,
+      TokenDistributionEvent.OutputTuple,
+      TokenDistributionEvent.OutputObject
+    >;
+
+    "Transfer(address,address,uint256)": TypedContractEvent<
+      TransferEvent.InputTuple,
+      TransferEvent.OutputTuple,
+      TransferEvent.OutputObject
+    >;
+    Transfer: TypedContractEvent<
+      TransferEvent.InputTuple,
+      TransferEvent.OutputTuple,
+      TransferEvent.OutputObject
+    >;
+
+    "VestingReleased(bytes32,uint256)": TypedContractEvent<
+      VestingReleasedEvent.InputTuple,
+      VestingReleasedEvent.OutputTuple,
+      VestingReleasedEvent.OutputObject
+    >;
+    VestingReleased: TypedContractEvent<
+      VestingReleasedEvent.InputTuple,
+      VestingReleasedEvent.OutputTuple,
+      VestingReleasedEvent.OutputObject
+    >;
+
+    "VestingScheduleCreated(address,uint256,uint256,uint256,uint256,bool)": TypedContractEvent<
+      VestingScheduleCreatedEvent.InputTuple,
+      VestingScheduleCreatedEvent.OutputTuple,
+      VestingScheduleCreatedEvent.OutputObject
+    >;
+    VestingScheduleCreated: TypedContractEvent<
+      VestingScheduleCreatedEvent.InputTuple,
+      VestingScheduleCreatedEvent.OutputTuple,
+      VestingScheduleCreatedEvent.OutputObject
+    >;
+
+    "VestingScheduleRevoked(bytes32)": TypedContractEvent<
+      VestingScheduleRevokedEvent.InputTuple,
+      VestingScheduleRevokedEvent.OutputTuple,
+      VestingScheduleRevokedEvent.OutputObject
+    >;
+    VestingScheduleRevoked: TypedContractEvent<
+      VestingScheduleRevokedEvent.InputTuple,
+      VestingScheduleRevokedEvent.OutputTuple,
+      VestingScheduleRevokedEvent.OutputObject
+    >;
   };
 }

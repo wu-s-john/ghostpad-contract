@@ -3,45 +3,27 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumber,
   BigNumberish,
   BytesLike,
-  CallOverrides,
-  ContractTransaction,
-  Overrides,
-  PopulatedTransaction,
-  Signer,
-  utils,
+  FunctionFragment,
+  Result,
+  Interface,
+  AddressLike,
+  ContractRunner,
+  ContractMethod,
+  Listener,
 } from "ethers";
-import type { FunctionFragment, Result } from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
 import type {
-  TypedEventFilter,
-  TypedEvent,
+  TypedContractEvent,
+  TypedDeferredTopicFilter,
+  TypedEventLog,
   TypedListener,
-  OnEvent,
+  TypedContractMethod,
 } from "./common";
 
-export interface MerkleTreeWithHistoryMockInterface extends utils.Interface {
-  functions: {
-    "FIELD_SIZE()": FunctionFragment;
-    "ROOT_HISTORY_SIZE()": FunctionFragment;
-    "ZERO_VALUE()": FunctionFragment;
-    "currentRootIndex()": FunctionFragment;
-    "filledSubtrees(uint256)": FunctionFragment;
-    "getLastRoot()": FunctionFragment;
-    "hashLeftRight(address,bytes32,bytes32)": FunctionFragment;
-    "hasher()": FunctionFragment;
-    "insert(bytes32)": FunctionFragment;
-    "isKnownRoot(bytes32)": FunctionFragment;
-    "levels()": FunctionFragment;
-    "nextIndex()": FunctionFragment;
-    "roots(uint256)": FunctionFragment;
-    "zeros(uint256)": FunctionFragment;
-  };
-
+export interface MerkleTreeWithHistoryMockInterface extends Interface {
   getFunction(
-    nameOrSignatureOrTopic:
+    nameOrSignature:
       | "FIELD_SIZE"
       | "ROOT_HISTORY_SIZE"
       | "ZERO_VALUE"
@@ -84,7 +66,7 @@ export interface MerkleTreeWithHistoryMockInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "hashLeftRight",
-    values: [string, BytesLike, BytesLike]
+    values: [AddressLike, BytesLike, BytesLike]
   ): string;
   encodeFunctionData(functionFragment: "hasher", values?: undefined): string;
   encodeFunctionData(functionFragment: "insert", values: [BytesLike]): string;
@@ -129,250 +111,133 @@ export interface MerkleTreeWithHistoryMockInterface extends utils.Interface {
   decodeFunctionResult(functionFragment: "nextIndex", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "roots", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "zeros", data: BytesLike): Result;
-
-  events: {};
 }
 
 export interface MerkleTreeWithHistoryMock extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(runner?: ContractRunner | null): MerkleTreeWithHistoryMock;
+  waitForDeployment(): Promise<this>;
 
   interface: MerkleTreeWithHistoryMockInterface;
 
-  queryFilter<TEvent extends TypedEvent>(
-    event: TypedEventFilter<TEvent>,
+  queryFilter<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  on<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  on<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  functions: {
-    FIELD_SIZE(overrides?: CallOverrides): Promise<[BigNumber]>;
+  once<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  once<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-    ROOT_HISTORY_SIZE(overrides?: CallOverrides): Promise<[number]>;
+  listeners<TCEvent extends TypedContractEvent>(
+    event: TCEvent
+  ): Promise<Array<TypedListener<TCEvent>>>;
+  listeners(eventName?: string): Promise<Array<Listener>>;
+  removeAllListeners<TCEvent extends TypedContractEvent>(
+    event?: TCEvent
+  ): Promise<this>;
 
-    ZERO_VALUE(overrides?: CallOverrides): Promise<[BigNumber]>;
+  FIELD_SIZE: TypedContractMethod<[], [bigint], "view">;
 
-    currentRootIndex(overrides?: CallOverrides): Promise<[number]>;
+  ROOT_HISTORY_SIZE: TypedContractMethod<[], [bigint], "view">;
 
-    filledSubtrees(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<[string]>;
+  ZERO_VALUE: TypedContractMethod<[], [bigint], "view">;
 
-    getLastRoot(overrides?: CallOverrides): Promise<[string]>;
+  currentRootIndex: TypedContractMethod<[], [bigint], "view">;
 
-    hashLeftRight(
-      _hasher: string,
-      _left: BytesLike,
-      _right: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[string]>;
+  filledSubtrees: TypedContractMethod<[arg0: BigNumberish], [string], "view">;
 
-    hasher(overrides?: CallOverrides): Promise<[string]>;
+  getLastRoot: TypedContractMethod<[], [string], "view">;
 
-    insert(
-      _leaf: BytesLike,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+  hashLeftRight: TypedContractMethod<
+    [_hasher: AddressLike, _left: BytesLike, _right: BytesLike],
+    [string],
+    "view"
+  >;
 
-    isKnownRoot(
-      _root: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[boolean]>;
+  hasher: TypedContractMethod<[], [string], "view">;
 
-    levels(overrides?: CallOverrides): Promise<[number]>;
+  insert: TypedContractMethod<[_leaf: BytesLike], [void], "nonpayable">;
 
-    nextIndex(overrides?: CallOverrides): Promise<[number]>;
+  isKnownRoot: TypedContractMethod<[_root: BytesLike], [boolean], "view">;
 
-    roots(arg0: BigNumberish, overrides?: CallOverrides): Promise<[string]>;
+  levels: TypedContractMethod<[], [bigint], "view">;
 
-    zeros(i: BigNumberish, overrides?: CallOverrides): Promise<[string]>;
-  };
+  nextIndex: TypedContractMethod<[], [bigint], "view">;
 
-  FIELD_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
+  roots: TypedContractMethod<[arg0: BigNumberish], [string], "view">;
 
-  ROOT_HISTORY_SIZE(overrides?: CallOverrides): Promise<number>;
+  zeros: TypedContractMethod<[i: BigNumberish], [string], "view">;
 
-  ZERO_VALUE(overrides?: CallOverrides): Promise<BigNumber>;
+  getFunction<T extends ContractMethod = ContractMethod>(
+    key: string | FunctionFragment
+  ): T;
 
-  currentRootIndex(overrides?: CallOverrides): Promise<number>;
-
-  filledSubtrees(
-    arg0: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<string>;
-
-  getLastRoot(overrides?: CallOverrides): Promise<string>;
-
-  hashLeftRight(
-    _hasher: string,
-    _left: BytesLike,
-    _right: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<string>;
-
-  hasher(overrides?: CallOverrides): Promise<string>;
-
-  insert(
-    _leaf: BytesLike,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  isKnownRoot(_root: BytesLike, overrides?: CallOverrides): Promise<boolean>;
-
-  levels(overrides?: CallOverrides): Promise<number>;
-
-  nextIndex(overrides?: CallOverrides): Promise<number>;
-
-  roots(arg0: BigNumberish, overrides?: CallOverrides): Promise<string>;
-
-  zeros(i: BigNumberish, overrides?: CallOverrides): Promise<string>;
-
-  callStatic: {
-    FIELD_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
-
-    ROOT_HISTORY_SIZE(overrides?: CallOverrides): Promise<number>;
-
-    ZERO_VALUE(overrides?: CallOverrides): Promise<BigNumber>;
-
-    currentRootIndex(overrides?: CallOverrides): Promise<number>;
-
-    filledSubtrees(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<string>;
-
-    getLastRoot(overrides?: CallOverrides): Promise<string>;
-
-    hashLeftRight(
-      _hasher: string,
-      _left: BytesLike,
-      _right: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<string>;
-
-    hasher(overrides?: CallOverrides): Promise<string>;
-
-    insert(_leaf: BytesLike, overrides?: CallOverrides): Promise<void>;
-
-    isKnownRoot(_root: BytesLike, overrides?: CallOverrides): Promise<boolean>;
-
-    levels(overrides?: CallOverrides): Promise<number>;
-
-    nextIndex(overrides?: CallOverrides): Promise<number>;
-
-    roots(arg0: BigNumberish, overrides?: CallOverrides): Promise<string>;
-
-    zeros(i: BigNumberish, overrides?: CallOverrides): Promise<string>;
-  };
+  getFunction(
+    nameOrSignature: "FIELD_SIZE"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "ROOT_HISTORY_SIZE"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "ZERO_VALUE"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "currentRootIndex"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "filledSubtrees"
+  ): TypedContractMethod<[arg0: BigNumberish], [string], "view">;
+  getFunction(
+    nameOrSignature: "getLastRoot"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "hashLeftRight"
+  ): TypedContractMethod<
+    [_hasher: AddressLike, _left: BytesLike, _right: BytesLike],
+    [string],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "hasher"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "insert"
+  ): TypedContractMethod<[_leaf: BytesLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "isKnownRoot"
+  ): TypedContractMethod<[_root: BytesLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "levels"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "nextIndex"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "roots"
+  ): TypedContractMethod<[arg0: BigNumberish], [string], "view">;
+  getFunction(
+    nameOrSignature: "zeros"
+  ): TypedContractMethod<[i: BigNumberish], [string], "view">;
 
   filters: {};
-
-  estimateGas: {
-    FIELD_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
-
-    ROOT_HISTORY_SIZE(overrides?: CallOverrides): Promise<BigNumber>;
-
-    ZERO_VALUE(overrides?: CallOverrides): Promise<BigNumber>;
-
-    currentRootIndex(overrides?: CallOverrides): Promise<BigNumber>;
-
-    filledSubtrees(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    getLastRoot(overrides?: CallOverrides): Promise<BigNumber>;
-
-    hashLeftRight(
-      _hasher: string,
-      _left: BytesLike,
-      _right: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    hasher(overrides?: CallOverrides): Promise<BigNumber>;
-
-    insert(
-      _leaf: BytesLike,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    isKnownRoot(
-      _root: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    levels(overrides?: CallOverrides): Promise<BigNumber>;
-
-    nextIndex(overrides?: CallOverrides): Promise<BigNumber>;
-
-    roots(arg0: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
-
-    zeros(i: BigNumberish, overrides?: CallOverrides): Promise<BigNumber>;
-  };
-
-  populateTransaction: {
-    FIELD_SIZE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    ROOT_HISTORY_SIZE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    ZERO_VALUE(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    currentRootIndex(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    filledSubtrees(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    getLastRoot(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    hashLeftRight(
-      _hasher: string,
-      _left: BytesLike,
-      _right: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    hasher(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    insert(
-      _leaf: BytesLike,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    isKnownRoot(
-      _root: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    levels(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    nextIndex(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    roots(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    zeros(
-      i: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-  };
 }

@@ -2,14 +2,19 @@
 /* tslint:disable */
 /* eslint-disable */
 import {
-  Signer,
-  utils,
   Contract,
   ContractFactory,
-  BigNumberish,
-  Overrides,
+  ContractTransactionResponse,
+  Interface,
 } from "ethers";
-import type { Provider, TransactionRequest } from "@ethersproject/providers";
+import type {
+  Signer,
+  BigNumberish,
+  AddressLike,
+  ContractDeployTransaction,
+  ContractRunner,
+} from "ethers";
+import type { NonPayableOverrides } from "../common";
 import type {
   MerkleTreeWithHistoryMock,
   MerkleTreeWithHistoryMockInterface,
@@ -276,44 +281,43 @@ export class MerkleTreeWithHistoryMock__factory extends ContractFactory {
     }
   }
 
-  override deploy(
-    _treeLevels: BigNumberish,
-    _hasher: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<MerkleTreeWithHistoryMock> {
-    return super.deploy(
-      _treeLevels,
-      _hasher,
-      overrides || {}
-    ) as Promise<MerkleTreeWithHistoryMock>;
-  }
   override getDeployTransaction(
     _treeLevels: BigNumberish,
-    _hasher: string,
-    overrides?: Overrides & { from?: string }
-  ): TransactionRequest {
+    _hasher: AddressLike,
+    overrides?: NonPayableOverrides & { from?: string }
+  ): Promise<ContractDeployTransaction> {
     return super.getDeployTransaction(_treeLevels, _hasher, overrides || {});
   }
-  override attach(address: string): MerkleTreeWithHistoryMock {
-    return super.attach(address) as MerkleTreeWithHistoryMock;
+  override deploy(
+    _treeLevels: BigNumberish,
+    _hasher: AddressLike,
+    overrides?: NonPayableOverrides & { from?: string }
+  ) {
+    return super.deploy(_treeLevels, _hasher, overrides || {}) as Promise<
+      MerkleTreeWithHistoryMock & {
+        deploymentTransaction(): ContractTransactionResponse;
+      }
+    >;
   }
-  override connect(signer: Signer): MerkleTreeWithHistoryMock__factory {
-    return super.connect(signer) as MerkleTreeWithHistoryMock__factory;
+  override connect(
+    runner: ContractRunner | null
+  ): MerkleTreeWithHistoryMock__factory {
+    return super.connect(runner) as MerkleTreeWithHistoryMock__factory;
   }
 
   static readonly bytecode = _bytecode;
   static readonly abi = _abi;
   static createInterface(): MerkleTreeWithHistoryMockInterface {
-    return new utils.Interface(_abi) as MerkleTreeWithHistoryMockInterface;
+    return new Interface(_abi) as MerkleTreeWithHistoryMockInterface;
   }
   static connect(
     address: string,
-    signerOrProvider: Signer | Provider
+    runner?: ContractRunner | null
   ): MerkleTreeWithHistoryMock {
     return new Contract(
       address,
       _abi,
-      signerOrProvider
-    ) as MerkleTreeWithHistoryMock;
+      runner
+    ) as unknown as MerkleTreeWithHistoryMock;
   }
 }

@@ -3,29 +3,25 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumber,
   BigNumberish,
   BytesLike,
-  CallOverrides,
-  PopulatedTransaction,
-  Signer,
-  utils,
+  FunctionFragment,
+  Result,
+  Interface,
+  ContractRunner,
+  ContractMethod,
+  Listener,
 } from "ethers";
-import type { FunctionFragment, Result } from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
 import type {
-  TypedEventFilter,
-  TypedEvent,
+  TypedContractEvent,
+  TypedDeferredTopicFilter,
+  TypedEventLog,
   TypedListener,
-  OnEvent,
+  TypedContractMethod,
 } from "./common";
 
-export interface MetadataVerifierInterface extends utils.Interface {
-  functions: {
-    "verifyProof(bytes,uint256[2])": FunctionFragment;
-  };
-
-  getFunction(nameOrSignatureOrTopic: "verifyProof"): FunctionFragment;
+export interface MetadataVerifierInterface extends Interface {
+  getFunction(nameOrSignature: "verifyProof"): FunctionFragment;
 
   encodeFunctionData(
     functionFragment: "verifyProof",
@@ -36,73 +32,68 @@ export interface MetadataVerifierInterface extends utils.Interface {
     functionFragment: "verifyProof",
     data: BytesLike
   ): Result;
-
-  events: {};
 }
 
 export interface MetadataVerifier extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(runner?: ContractRunner | null): MetadataVerifier;
+  waitForDeployment(): Promise<this>;
 
   interface: MetadataVerifierInterface;
 
-  queryFilter<TEvent extends TypedEvent>(
-    event: TypedEventFilter<TEvent>,
+  queryFilter<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  on<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  on<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  functions: {
-    verifyProof(
-      proof: BytesLike,
-      input: [BigNumberish, BigNumberish],
-      overrides?: CallOverrides
-    ): Promise<[boolean]>;
-  };
+  once<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  once<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  verifyProof(
-    proof: BytesLike,
-    input: [BigNumberish, BigNumberish],
-    overrides?: CallOverrides
-  ): Promise<boolean>;
+  listeners<TCEvent extends TypedContractEvent>(
+    event: TCEvent
+  ): Promise<Array<TypedListener<TCEvent>>>;
+  listeners(eventName?: string): Promise<Array<Listener>>;
+  removeAllListeners<TCEvent extends TypedContractEvent>(
+    event?: TCEvent
+  ): Promise<this>;
 
-  callStatic: {
-    verifyProof(
-      proof: BytesLike,
-      input: [BigNumberish, BigNumberish],
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-  };
+  verifyProof: TypedContractMethod<
+    [proof: BytesLike, input: [BigNumberish, BigNumberish]],
+    [boolean],
+    "view"
+  >;
+
+  getFunction<T extends ContractMethod = ContractMethod>(
+    key: string | FunctionFragment
+  ): T;
+
+  getFunction(
+    nameOrSignature: "verifyProof"
+  ): TypedContractMethod<
+    [proof: BytesLike, input: [BigNumberish, BigNumberish]],
+    [boolean],
+    "view"
+  >;
 
   filters: {};
-
-  estimateGas: {
-    verifyProof(
-      proof: BytesLike,
-      input: [BigNumberish, BigNumberish],
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-  };
-
-  populateTransaction: {
-    verifyProof(
-      proof: BytesLike,
-      input: [BigNumberish, BigNumberish],
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-  };
 }

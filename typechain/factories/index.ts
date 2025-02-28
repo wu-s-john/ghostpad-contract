@@ -6,6 +6,5 @@ export { Hasher__factory } from "./Hasher__factory";
 export { MerkleTreeWithHistoryMock__factory } from "./MerkleTreeWithHistoryMock__factory";
 export { MetadataVerifier__factory } from "./MetadataVerifier__factory";
 export { TokenTemplate__factory } from "./TokenTemplate__factory";
-export { Tornado__factory } from "./Tornado__factory";
 export { UniswapHandler__factory } from "./UniswapHandler__factory";
 export { Verifier__factory } from "./Verifier__factory";

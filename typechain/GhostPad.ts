@@ -3,28 +3,24 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumber,
   BigNumberish,
   BytesLike,
-  CallOverrides,
-  ContractTransaction,
-  Overrides,
-  PayableOverrides,
-  PopulatedTransaction,
-  Signer,
-  utils,
-} from "ethers";
-import type {
   FunctionFragment,
   Result,
+  Interface,
   EventFragment,
-} from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
+  AddressLike,
+  ContractRunner,
+  ContractMethod,
+  Listener,
+} from "ethers";
 import type {
-  TypedEventFilter,
-  TypedEvent,
+  TypedContractEvent,
+  TypedDeferredTopicFilter,
+  TypedEventLog,
+  TypedLogDescription,
   TypedListener,
-  OnEvent,
+  TypedContractMethod,
 } from "./common";
 
 export declare namespace GhostPad {
@@ -34,29 +30,38 @@ export declare namespace GhostPad {
     initialSupply: BigNumberish;
     description: string;
     taxRate: BigNumberish;
-    taxRecipient: string;
+    taxRecipient: AddressLike;
     burnEnabled: boolean;
     liquidityLockPeriod: BigNumberish;
+    liquidityTokenAmount: BigNumberish;
+    useProtocolFee: boolean;
+    vestingEnabled: boolean;
   };
 
   export type TokenDataStructOutput = [
-    string,
-    string,
-    BigNumber,
-    string,
-    BigNumber,
-    string,
-    boolean,
-    BigNumber
+    name: string,
+    symbol: string,
+    initialSupply: bigint,
+    description: string,
+    taxRate: bigint,
+    taxRecipient: string,
+    burnEnabled: boolean,
+    liquidityLockPeriod: bigint,
+    liquidityTokenAmount: bigint,
+    useProtocolFee: boolean,
+    vestingEnabled: boolean
   ] & {
     name: string;
     symbol: string;
-    initialSupply: BigNumber;
+    initialSupply: bigint;
     description: string;
-    taxRate: BigNumber;
+    taxRate: bigint;
     taxRecipient: string;
     burnEnabled: boolean;
-    liquidityLockPeriod: BigNumber;
+    liquidityLockPeriod: bigint;
+    liquidityTokenAmount: bigint;
+    useProtocolFee: boolean;
+    vestingEnabled: boolean;
   };
 
   export type ProofDataStruct = {
@@ -64,68 +69,36 @@ export declare namespace GhostPad {
     proof: BytesLike;
     root: BytesLike;
     nullifierHash: BytesLike;
-    recipient: string;
-    relayer: string;
+    recipient: AddressLike;
+    relayer: AddressLike;
     fee: BigNumberish;
     refund: BigNumberish;
-    metadataProof: BytesLike;
-    metadataHash: BytesLike;
   };
 
   export type ProofDataStructOutput = [
-    BigNumber,
-    string,
-    string,
-    string,
-    string,
-    string,
-    BigNumber,
-    BigNumber,
-    string,
-    string
+    instanceIndex: bigint,
+    proof: string,
+    root: string,
+    nullifierHash: string,
+    recipient: string,
+    relayer: string,
+    fee: bigint,
+    refund: bigint
   ] & {
-    instanceIndex: BigNumber;
+    instanceIndex: bigint;
     proof: string;
     root: string;
     nullifierHash: string;
     recipient: string;
     relayer: string;
-    fee: BigNumber;
-    refund: BigNumber;
-    metadataProof: string;
-    metadataHash: string;
+    fee: bigint;
+    refund: bigint;
   };
 }
 
-export interface GhostPadInterface extends utils.Interface {
-  functions: {
-    "MAX_GOVERNANCE_FEE()": FunctionFragment;
-    "deployToken((string,string,uint256,string,uint256,address,bool,uint256),(uint256,bytes,bytes32,bytes32,address,address,uint256,uint256,bytes,bytes32),bool,bool)": FunctionFragment;
-    "deployTokenWithLiquidity((string,string,uint256,string,uint256,address,bool,uint256),(uint256,bytes,bytes32,bytes32,address,address,uint256,uint256,bytes,bytes32),uint256,uint256,bool,bool)": FunctionFragment;
-    "deployedTokens(bytes32)": FunctionFragment;
-    "getDeployedToken(bytes32)": FunctionFragment;
-    "getTornadoInstance(uint256)": FunctionFragment;
-    "governance()": FunctionFragment;
-    "governanceFee()": FunctionFragment;
-    "instanceCount()": FunctionFragment;
-    "metadataVerifier()": FunctionFragment;
-    "nullifierHashUsed(bytes32)": FunctionFragment;
-    "owner()": FunctionFragment;
-    "recoverERC20(address,uint256)": FunctionFragment;
-    "recoverETH()": FunctionFragment;
-    "renounceOwnership()": FunctionFragment;
-    "tokenTemplate()": FunctionFragment;
-    "tornadoInstances(uint256)": FunctionFragment;
-    "transferOwnership(address)": FunctionFragment;
-    "uniswapHandler()": FunctionFragment;
-    "updateGovernance(address)": FunctionFragment;
-    "updateGovernanceFee(uint32)": FunctionFragment;
-    "updateMetadataVerifier(address)": FunctionFragment;
-    "updateUniswapHandler(address)": FunctionFragment;
-  };
-
+export interface GhostPadInterface extends Interface {
   getFunction(
-    nameOrSignatureOrTopic:
+    nameOrSignature:
       | "MAX_GOVERNANCE_FEE"
       | "deployToken"
       | "deployTokenWithLiquidity"
@@ -135,7 +108,6 @@ export interface GhostPadInterface extends utils.Interface {
       | "governance"
       | "governanceFee"
       | "instanceCount"
-      | "metadataVerifier"
       | "nullifierHashUsed"
       | "owner"
       | "recoverERC20"
@@ -147,9 +119,18 @@ export interface GhostPadInterface extends utils.Interface {
       | "uniswapHandler"
       | "updateGovernance"
       | "updateGovernanceFee"
-      | "updateMetadataVerifier"
       | "updateUniswapHandler"
   ): FunctionFragment;
+
+  getEvent(
+    nameOrSignatureOrTopic:
+      | "GovernanceFeeUpdated"
+      | "GovernanceUpdated"
+      | "LiquidityPoolCreated"
+      | "OwnershipTransferred"
+      | "TokenDeployed"
+      | "UniswapHandlerUpdated"
+  ): EventFragment;
 
   encodeFunctionData(
     functionFragment: "MAX_GOVERNANCE_FEE",
@@ -157,23 +138,11 @@ export interface GhostPadInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "deployToken",
-    values: [
-      GhostPad.TokenDataStruct,
-      GhostPad.ProofDataStruct,
-      boolean,
-      boolean
-    ]
+    values: [GhostPad.TokenDataStruct, GhostPad.ProofDataStruct]
   ): string;
   encodeFunctionData(
     functionFragment: "deployTokenWithLiquidity",
-    values: [
-      GhostPad.TokenDataStruct,
-      GhostPad.ProofDataStruct,
-      BigNumberish,
-      BigNumberish,
-      boolean,
-      boolean
-    ]
+    values: [GhostPad.TokenDataStruct, GhostPad.ProofDataStruct]
   ): string;
   encodeFunctionData(
     functionFragment: "deployedTokens",
@@ -200,17 +169,13 @@ export interface GhostPadInterface extends utils.Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
-    functionFragment: "metadataVerifier",
-    values?: undefined
-  ): string;
-  encodeFunctionData(
     functionFragment: "nullifierHashUsed",
     values: [BytesLike]
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "recoverERC20",
-    values: [string, BigNumberish]
+    values: [AddressLike, BigNumberish]
   ): string;
   encodeFunctionData(
     functionFragment: "recoverETH",
@@ -230,7 +195,7 @@ export interface GhostPadInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "transferOwnership",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "uniswapHandler",
@@ -238,19 +203,15 @@ export interface GhostPadInterface extends utils.Interface {
   ): string;
   encodeFunctionData(
     functionFragment: "updateGovernance",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "updateGovernanceFee",
     values: [BigNumberish]
   ): string;
   encodeFunctionData(
-    functionFragment: "updateMetadataVerifier",
-    values: [string]
-  ): string;
-  encodeFunctionData(
     functionFragment: "updateUniswapHandler",
-    values: [string]
+    values: [AddressLike]
   ): string;
 
   decodeFunctionResult(
@@ -284,10 +245,6 @@ export interface GhostPadInterface extends utils.Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "instanceCount",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "metadataVerifier",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -329,713 +286,434 @@ export interface GhostPadInterface extends utils.Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
-    functionFragment: "updateMetadataVerifier",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
     functionFragment: "updateUniswapHandler",
     data: BytesLike
   ): Result;
-
-  events: {
-    "GovernanceFeeUpdated(uint32,uint32)": EventFragment;
-    "GovernanceUpdated(address,address)": EventFragment;
-    "LiquidityPoolCreated(address,address,uint256)": EventFragment;
-    "MetadataVerifierUpdated(address,address)": EventFragment;
-    "OwnershipTransferred(address,address)": EventFragment;
-    "TokenDeployed(bytes32,address,string,string)": EventFragment;
-    "UniswapHandlerUpdated(address,address)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "GovernanceFeeUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "GovernanceUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "LiquidityPoolCreated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "MetadataVerifierUpdated"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "TokenDeployed"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "UniswapHandlerUpdated"): EventFragment;
 }
 
-export interface GovernanceFeeUpdatedEventObject {
-  oldFee: number;
-  newFee: number;
+export namespace GovernanceFeeUpdatedEvent {
+  export type InputTuple = [oldFee: BigNumberish, newFee: BigNumberish];
+  export type OutputTuple = [oldFee: bigint, newFee: bigint];
+  export interface OutputObject {
+    oldFee: bigint;
+    newFee: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type GovernanceFeeUpdatedEvent = TypedEvent<
-  [number, number],
-  GovernanceFeeUpdatedEventObject
->;
 
-export type GovernanceFeeUpdatedEventFilter =
-  TypedEventFilter<GovernanceFeeUpdatedEvent>;
-
-export interface GovernanceUpdatedEventObject {
-  oldGovernance: string;
-  newGovernance: string;
+export namespace GovernanceUpdatedEvent {
+  export type InputTuple = [
+    oldGovernance: AddressLike,
+    newGovernance: AddressLike
+  ];
+  export type OutputTuple = [oldGovernance: string, newGovernance: string];
+  export interface OutputObject {
+    oldGovernance: string;
+    newGovernance: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type GovernanceUpdatedEvent = TypedEvent<
-  [string, string],
-  GovernanceUpdatedEventObject
->;
 
-export type GovernanceUpdatedEventFilter =
-  TypedEventFilter<GovernanceUpdatedEvent>;
-
-export interface LiquidityPoolCreatedEventObject {
-  tokenAddress: string;
-  pairAddress: string;
-  liquidityAdded: BigNumber;
+export namespace LiquidityPoolCreatedEvent {
+  export type InputTuple = [
+    tokenAddress: AddressLike,
+    pairAddress: AddressLike,
+    liquidityAdded: BigNumberish
+  ];
+  export type OutputTuple = [
+    tokenAddress: string,
+    pairAddress: string,
+    liquidityAdded: bigint
+  ];
+  export interface OutputObject {
+    tokenAddress: string;
+    pairAddress: string;
+    liquidityAdded: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type LiquidityPoolCreatedEvent = TypedEvent<
-  [string, string, BigNumber],
-  LiquidityPoolCreatedEventObject
->;
 
-export type LiquidityPoolCreatedEventFilter =
-  TypedEventFilter<LiquidityPoolCreatedEvent>;
-
-export interface MetadataVerifierUpdatedEventObject {
-  oldVerifier: string;
-  newVerifier: string;
+export namespace OwnershipTransferredEvent {
+  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
+  export type OutputTuple = [previousOwner: string, newOwner: string];
+  export interface OutputObject {
+    previousOwner: string;
+    newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type MetadataVerifierUpdatedEvent = TypedEvent<
-  [string, string],
-  MetadataVerifierUpdatedEventObject
->;
 
-export type MetadataVerifierUpdatedEventFilter =
-  TypedEventFilter<MetadataVerifierUpdatedEvent>;
-
-export interface OwnershipTransferredEventObject {
-  previousOwner: string;
-  newOwner: string;
+export namespace TokenDeployedEvent {
+  export type InputTuple = [
+    nullifierHash: BytesLike,
+    tokenAddress: AddressLike,
+    name: string,
+    symbol: string
+  ];
+  export type OutputTuple = [
+    nullifierHash: string,
+    tokenAddress: string,
+    name: string,
+    symbol: string
+  ];
+  export interface OutputObject {
+    nullifierHash: string;
+    tokenAddress: string;
+    name: string;
+    symbol: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type OwnershipTransferredEvent = TypedEvent<
-  [string, string],
-  OwnershipTransferredEventObject
->;
 
-export type OwnershipTransferredEventFilter =
-  TypedEventFilter<OwnershipTransferredEvent>;
-
-export interface TokenDeployedEventObject {
-  nullifierHash: string;
-  tokenAddress: string;
-  name: string;
-  symbol: string;
+export namespace UniswapHandlerUpdatedEvent {
+  export type InputTuple = [oldHandler: AddressLike, newHandler: AddressLike];
+  export type OutputTuple = [oldHandler: string, newHandler: string];
+  export interface OutputObject {
+    oldHandler: string;
+    newHandler: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type TokenDeployedEvent = TypedEvent<
-  [string, string, string, string],
-  TokenDeployedEventObject
->;
-
-export type TokenDeployedEventFilter = TypedEventFilter<TokenDeployedEvent>;
-
-export interface UniswapHandlerUpdatedEventObject {
-  oldHandler: string;
-  newHandler: string;
-}
-export type UniswapHandlerUpdatedEvent = TypedEvent<
-  [string, string],
-  UniswapHandlerUpdatedEventObject
->;
-
-export type UniswapHandlerUpdatedEventFilter =
-  TypedEventFilter<UniswapHandlerUpdatedEvent>;
 
 export interface GhostPad extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(runner?: ContractRunner | null): GhostPad;
+  waitForDeployment(): Promise<this>;
 
   interface: GhostPadInterface;
 
-  queryFilter<TEvent extends TypedEvent>(
-    event: TypedEventFilter<TEvent>,
+  queryFilter<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  on<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  on<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  functions: {
-    MAX_GOVERNANCE_FEE(overrides?: CallOverrides): Promise<[number]>;
+  once<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  once<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-    deployToken(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
+  listeners<TCEvent extends TypedContractEvent>(
+    event: TCEvent
+  ): Promise<Array<TypedListener<TCEvent>>>;
+  listeners(eventName?: string): Promise<Array<Listener>>;
+  removeAllListeners<TCEvent extends TypedContractEvent>(
+    event?: TCEvent
+  ): Promise<this>;
 
-    deployTokenWithLiquidity(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      liquidityTokenAmount: BigNumberish,
-      liquidityEthAmount: BigNumberish,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: PayableOverrides & { from?: string }
-    ): Promise<ContractTransaction>;
+  MAX_GOVERNANCE_FEE: TypedContractMethod<[], [bigint], "view">;
 
-    deployedTokens(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[string]>;
-
-    getDeployedToken(
-      nullifierHash: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[string]>;
-
-    getTornadoInstance(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, BigNumber] & { instance: string; denomination: BigNumber }
-    >;
-
-    governance(overrides?: CallOverrides): Promise<[string]>;
-
-    governanceFee(overrides?: CallOverrides): Promise<[number]>;
-
-    instanceCount(overrides?: CallOverrides): Promise<[BigNumber]>;
-
-    metadataVerifier(overrides?: CallOverrides): Promise<[string]>;
-
-    nullifierHashUsed(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<[boolean]>;
-
-    owner(overrides?: CallOverrides): Promise<[string]>;
-
-    recoverERC20(
-      token: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    recoverETH(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    tokenTemplate(overrides?: CallOverrides): Promise<[string]>;
-
-    tornadoInstances(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, BigNumber] & { instance: string; denomination: BigNumber }
-    >;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    uniswapHandler(overrides?: CallOverrides): Promise<[string]>;
-
-    updateGovernance(
-      _newGovernance: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    updateGovernanceFee(
-      _newFee: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    updateMetadataVerifier(
-      _newVerifier: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    updateUniswapHandler(
-      _newHandler: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-  };
-
-  MAX_GOVERNANCE_FEE(overrides?: CallOverrides): Promise<number>;
-
-  deployToken(
-    tokenData: GhostPad.TokenDataStruct,
-    proofData: GhostPad.ProofDataStruct,
-    useProtocolFee: boolean,
-    vestingEnabled: boolean,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  deployTokenWithLiquidity(
-    tokenData: GhostPad.TokenDataStruct,
-    proofData: GhostPad.ProofDataStruct,
-    liquidityTokenAmount: BigNumberish,
-    liquidityEthAmount: BigNumberish,
-    useProtocolFee: boolean,
-    vestingEnabled: boolean,
-    overrides?: PayableOverrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  deployedTokens(arg0: BytesLike, overrides?: CallOverrides): Promise<string>;
-
-  getDeployedToken(
-    nullifierHash: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<string>;
-
-  getTornadoInstance(
-    index: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<
-    [string, BigNumber] & { instance: string; denomination: BigNumber }
+  deployToken: TypedContractMethod<
+    [tokenData: GhostPad.TokenDataStruct, proofData: GhostPad.ProofDataStruct],
+    [string],
+    "nonpayable"
   >;
 
-  governance(overrides?: CallOverrides): Promise<string>;
-
-  governanceFee(overrides?: CallOverrides): Promise<number>;
-
-  instanceCount(overrides?: CallOverrides): Promise<BigNumber>;
-
-  metadataVerifier(overrides?: CallOverrides): Promise<string>;
-
-  nullifierHashUsed(
-    arg0: BytesLike,
-    overrides?: CallOverrides
-  ): Promise<boolean>;
-
-  owner(overrides?: CallOverrides): Promise<string>;
-
-  recoverERC20(
-    token: string,
-    amount: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  recoverETH(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  renounceOwnership(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  tokenTemplate(overrides?: CallOverrides): Promise<string>;
-
-  tornadoInstances(
-    arg0: BigNumberish,
-    overrides?: CallOverrides
-  ): Promise<
-    [string, BigNumber] & { instance: string; denomination: BigNumber }
+  deployTokenWithLiquidity: TypedContractMethod<
+    [tokenData: GhostPad.TokenDataStruct, proofData: GhostPad.ProofDataStruct],
+    [string],
+    "payable"
   >;
 
-  transferOwnership(
-    newOwner: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  deployedTokens: TypedContractMethod<[arg0: BytesLike], [string], "view">;
 
-  uniswapHandler(overrides?: CallOverrides): Promise<string>;
+  getDeployedToken: TypedContractMethod<
+    [nullifierHash: BytesLike],
+    [string],
+    "view"
+  >;
 
-  updateGovernance(
-    _newGovernance: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  getTornadoInstance: TypedContractMethod<
+    [index: BigNumberish],
+    [[string, bigint] & { instance: string; denomination: bigint }],
+    "view"
+  >;
 
-  updateGovernanceFee(
-    _newFee: BigNumberish,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  governance: TypedContractMethod<[], [string], "view">;
 
-  updateMetadataVerifier(
-    _newVerifier: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  governanceFee: TypedContractMethod<[], [bigint], "view">;
 
-  updateUniswapHandler(
-    _newHandler: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  instanceCount: TypedContractMethod<[], [bigint], "view">;
 
-  callStatic: {
-    MAX_GOVERNANCE_FEE(overrides?: CallOverrides): Promise<number>;
+  nullifierHashUsed: TypedContractMethod<[arg0: BytesLike], [boolean], "view">;
 
-    deployToken(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: CallOverrides
-    ): Promise<string>;
+  owner: TypedContractMethod<[], [string], "view">;
 
-    deployTokenWithLiquidity(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      liquidityTokenAmount: BigNumberish,
-      liquidityEthAmount: BigNumberish,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: CallOverrides
-    ): Promise<string>;
+  recoverERC20: TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-    deployedTokens(arg0: BytesLike, overrides?: CallOverrides): Promise<string>;
+  recoverETH: TypedContractMethod<[], [void], "nonpayable">;
 
-    getDeployedToken(
-      nullifierHash: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<string>;
+  renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
-    getTornadoInstance(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, BigNumber] & { instance: string; denomination: BigNumber }
-    >;
+  tokenTemplate: TypedContractMethod<[], [string], "view">;
 
-    governance(overrides?: CallOverrides): Promise<string>;
+  tornadoInstances: TypedContractMethod<
+    [arg0: BigNumberish],
+    [[string, bigint] & { instance: string; denomination: bigint }],
+    "view"
+  >;
 
-    governanceFee(overrides?: CallOverrides): Promise<number>;
+  transferOwnership: TypedContractMethod<
+    [newOwner: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-    instanceCount(overrides?: CallOverrides): Promise<BigNumber>;
+  uniswapHandler: TypedContractMethod<[], [string], "view">;
 
-    metadataVerifier(overrides?: CallOverrides): Promise<string>;
+  updateGovernance: TypedContractMethod<
+    [_newGovernance: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-    nullifierHashUsed(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
+  updateGovernanceFee: TypedContractMethod<
+    [_newFee: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
 
-    owner(overrides?: CallOverrides): Promise<string>;
+  updateUniswapHandler: TypedContractMethod<
+    [_newHandler: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-    recoverERC20(
-      token: string,
-      amount: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
+  getFunction<T extends ContractMethod = ContractMethod>(
+    key: string | FunctionFragment
+  ): T;
 
-    recoverETH(overrides?: CallOverrides): Promise<void>;
+  getFunction(
+    nameOrSignature: "MAX_GOVERNANCE_FEE"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "deployToken"
+  ): TypedContractMethod<
+    [tokenData: GhostPad.TokenDataStruct, proofData: GhostPad.ProofDataStruct],
+    [string],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "deployTokenWithLiquidity"
+  ): TypedContractMethod<
+    [tokenData: GhostPad.TokenDataStruct, proofData: GhostPad.ProofDataStruct],
+    [string],
+    "payable"
+  >;
+  getFunction(
+    nameOrSignature: "deployedTokens"
+  ): TypedContractMethod<[arg0: BytesLike], [string], "view">;
+  getFunction(
+    nameOrSignature: "getDeployedToken"
+  ): TypedContractMethod<[nullifierHash: BytesLike], [string], "view">;
+  getFunction(
+    nameOrSignature: "getTornadoInstance"
+  ): TypedContractMethod<
+    [index: BigNumberish],
+    [[string, bigint] & { instance: string; denomination: bigint }],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "governance"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "governanceFee"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "instanceCount"
+  ): TypedContractMethod<[], [bigint], "view">;
+  getFunction(
+    nameOrSignature: "nullifierHashUsed"
+  ): TypedContractMethod<[arg0: BytesLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "owner"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "recoverERC20"
+  ): TypedContractMethod<
+    [token: AddressLike, amount: BigNumberish],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "recoverETH"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "renounceOwnership"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "tokenTemplate"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "tornadoInstances"
+  ): TypedContractMethod<
+    [arg0: BigNumberish],
+    [[string, bigint] & { instance: string; denomination: bigint }],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "transferOwnership"
+  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "uniswapHandler"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "updateGovernance"
+  ): TypedContractMethod<[_newGovernance: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "updateGovernanceFee"
+  ): TypedContractMethod<[_newFee: BigNumberish], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "updateUniswapHandler"
+  ): TypedContractMethod<[_newHandler: AddressLike], [void], "nonpayable">;
 
-    renounceOwnership(overrides?: CallOverrides): Promise<void>;
-
-    tokenTemplate(overrides?: CallOverrides): Promise<string>;
-
-    tornadoInstances(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, BigNumber] & { instance: string; denomination: BigNumber }
-    >;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    uniswapHandler(overrides?: CallOverrides): Promise<string>;
-
-    updateGovernance(
-      _newGovernance: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    updateGovernanceFee(
-      _newFee: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    updateMetadataVerifier(
-      _newVerifier: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    updateUniswapHandler(
-      _newHandler: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-  };
+  getEvent(
+    key: "GovernanceFeeUpdated"
+  ): TypedContractEvent<
+    GovernanceFeeUpdatedEvent.InputTuple,
+    GovernanceFeeUpdatedEvent.OutputTuple,
+    GovernanceFeeUpdatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "GovernanceUpdated"
+  ): TypedContractEvent<
+    GovernanceUpdatedEvent.InputTuple,
+    GovernanceUpdatedEvent.OutputTuple,
+    GovernanceUpdatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "LiquidityPoolCreated"
+  ): TypedContractEvent<
+    LiquidityPoolCreatedEvent.InputTuple,
+    LiquidityPoolCreatedEvent.OutputTuple,
+    LiquidityPoolCreatedEvent.OutputObject
+  >;
+  getEvent(
+    key: "OwnershipTransferred"
+  ): TypedContractEvent<
+    OwnershipTransferredEvent.InputTuple,
+    OwnershipTransferredEvent.OutputTuple,
+    OwnershipTransferredEvent.OutputObject
+  >;
+  getEvent(
+    key: "TokenDeployed"
+  ): TypedContractEvent<
+    TokenDeployedEvent.InputTuple,
+    TokenDeployedEvent.OutputTuple,
+    TokenDeployedEvent.OutputObject
+  >;
+  getEvent(
+    key: "UniswapHandlerUpdated"
+  ): TypedContractEvent<
+    UniswapHandlerUpdatedEvent.InputTuple,
+    UniswapHandlerUpdatedEvent.OutputTuple,
+    UniswapHandlerUpdatedEvent.OutputObject
+  >;
 
   filters: {
-    "GovernanceFeeUpdated(uint32,uint32)"(
-      oldFee?: null,
-      newFee?: null
-    ): GovernanceFeeUpdatedEventFilter;
-    GovernanceFeeUpdated(
-      oldFee?: null,
-      newFee?: null
-    ): GovernanceFeeUpdatedEventFilter;
+    "GovernanceFeeUpdated(uint32,uint32)": TypedContractEvent<
+      GovernanceFeeUpdatedEvent.InputTuple,
+      GovernanceFeeUpdatedEvent.OutputTuple,
+      GovernanceFeeUpdatedEvent.OutputObject
+    >;
+    GovernanceFeeUpdated: TypedContractEvent<
+      GovernanceFeeUpdatedEvent.InputTuple,
+      GovernanceFeeUpdatedEvent.OutputTuple,
+      GovernanceFeeUpdatedEvent.OutputObject
+    >;
 
-    "GovernanceUpdated(address,address)"(
-      oldGovernance?: string | null,
-      newGovernance?: string | null
-    ): GovernanceUpdatedEventFilter;
-    GovernanceUpdated(
-      oldGovernance?: string | null,
-      newGovernance?: string | null
-    ): GovernanceUpdatedEventFilter;
+    "GovernanceUpdated(address,address)": TypedContractEvent<
+      GovernanceUpdatedEvent.InputTuple,
+      GovernanceUpdatedEvent.OutputTuple,
+      GovernanceUpdatedEvent.OutputObject
+    >;
+    GovernanceUpdated: TypedContractEvent<
+      GovernanceUpdatedEvent.InputTuple,
+      GovernanceUpdatedEvent.OutputTuple,
+      GovernanceUpdatedEvent.OutputObject
+    >;
 
-    "LiquidityPoolCreated(address,address,uint256)"(
-      tokenAddress?: string | null,
-      pairAddress?: string | null,
-      liquidityAdded?: null
-    ): LiquidityPoolCreatedEventFilter;
-    LiquidityPoolCreated(
-      tokenAddress?: string | null,
-      pairAddress?: string | null,
-      liquidityAdded?: null
-    ): LiquidityPoolCreatedEventFilter;
+    "LiquidityPoolCreated(address,address,uint256)": TypedContractEvent<
+      LiquidityPoolCreatedEvent.InputTuple,
+      LiquidityPoolCreatedEvent.OutputTuple,
+      LiquidityPoolCreatedEvent.OutputObject
+    >;
+    LiquidityPoolCreated: TypedContractEvent<
+      LiquidityPoolCreatedEvent.InputTuple,
+      LiquidityPoolCreatedEvent.OutputTuple,
+      LiquidityPoolCreatedEvent.OutputObject
+    >;
 
-    "MetadataVerifierUpdated(address,address)"(
-      oldVerifier?: string | null,
-      newVerifier?: string | null
-    ): MetadataVerifierUpdatedEventFilter;
-    MetadataVerifierUpdated(
-      oldVerifier?: string | null,
-      newVerifier?: string | null
-    ): MetadataVerifierUpdatedEventFilter;
+    "OwnershipTransferred(address,address)": TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
+    OwnershipTransferred: TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
 
-    "OwnershipTransferred(address,address)"(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter;
-    OwnershipTransferred(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter;
+    "TokenDeployed(bytes32,address,string,string)": TypedContractEvent<
+      TokenDeployedEvent.InputTuple,
+      TokenDeployedEvent.OutputTuple,
+      TokenDeployedEvent.OutputObject
+    >;
+    TokenDeployed: TypedContractEvent<
+      TokenDeployedEvent.InputTuple,
+      TokenDeployedEvent.OutputTuple,
+      TokenDeployedEvent.OutputObject
+    >;
 
-    "TokenDeployed(bytes32,address,string,string)"(
-      nullifierHash?: BytesLike | null,
-      tokenAddress?: null,
-      name?: null,
-      symbol?: null
-    ): TokenDeployedEventFilter;
-    TokenDeployed(
-      nullifierHash?: BytesLike | null,
-      tokenAddress?: null,
-      name?: null,
-      symbol?: null
-    ): TokenDeployedEventFilter;
-
-    "UniswapHandlerUpdated(address,address)"(
-      oldHandler?: string | null,
-      newHandler?: string | null
-    ): UniswapHandlerUpdatedEventFilter;
-    UniswapHandlerUpdated(
-      oldHandler?: string | null,
-      newHandler?: string | null
-    ): UniswapHandlerUpdatedEventFilter;
-  };
-
-  estimateGas: {
-    MAX_GOVERNANCE_FEE(overrides?: CallOverrides): Promise<BigNumber>;
-
-    deployToken(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    deployTokenWithLiquidity(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      liquidityTokenAmount: BigNumberish,
-      liquidityEthAmount: BigNumberish,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: PayableOverrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    deployedTokens(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    getDeployedToken(
-      nullifierHash: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    getTornadoInstance(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    governance(overrides?: CallOverrides): Promise<BigNumber>;
-
-    governanceFee(overrides?: CallOverrides): Promise<BigNumber>;
-
-    instanceCount(overrides?: CallOverrides): Promise<BigNumber>;
-
-    metadataVerifier(overrides?: CallOverrides): Promise<BigNumber>;
-
-    nullifierHashUsed(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    owner(overrides?: CallOverrides): Promise<BigNumber>;
-
-    recoverERC20(
-      token: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    recoverETH(overrides?: Overrides & { from?: string }): Promise<BigNumber>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    tokenTemplate(overrides?: CallOverrides): Promise<BigNumber>;
-
-    tornadoInstances(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    uniswapHandler(overrides?: CallOverrides): Promise<BigNumber>;
-
-    updateGovernance(
-      _newGovernance: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    updateGovernanceFee(
-      _newFee: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    updateMetadataVerifier(
-      _newVerifier: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    updateUniswapHandler(
-      _newHandler: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-  };
-
-  populateTransaction: {
-    MAX_GOVERNANCE_FEE(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    deployToken(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    deployTokenWithLiquidity(
-      tokenData: GhostPad.TokenDataStruct,
-      proofData: GhostPad.ProofDataStruct,
-      liquidityTokenAmount: BigNumberish,
-      liquidityEthAmount: BigNumberish,
-      useProtocolFee: boolean,
-      vestingEnabled: boolean,
-      overrides?: PayableOverrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    deployedTokens(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    getDeployedToken(
-      nullifierHash: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    getTornadoInstance(
-      index: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    governance(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    governanceFee(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    instanceCount(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    metadataVerifier(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    nullifierHashUsed(
-      arg0: BytesLike,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    recoverERC20(
-      token: string,
-      amount: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    recoverETH(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    tokenTemplate(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    tornadoInstances(
-      arg0: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    uniswapHandler(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    updateGovernance(
-      _newGovernance: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    updateGovernanceFee(
-      _newFee: BigNumberish,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    updateMetadataVerifier(
-      _newVerifier: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    updateUniswapHandler(
-      _newHandler: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
+    "UniswapHandlerUpdated(address,address)": TypedContractEvent<
+      UniswapHandlerUpdatedEvent.InputTuple,
+      UniswapHandlerUpdatedEvent.OutputTuple,
+      UniswapHandlerUpdatedEvent.OutputObject
+    >;
+    UniswapHandlerUpdated: TypedContractEvent<
+      UniswapHandlerUpdatedEvent.InputTuple,
+      UniswapHandlerUpdatedEvent.OutputTuple,
+      UniswapHandlerUpdatedEvent.OutputObject
+    >;
   };
 }

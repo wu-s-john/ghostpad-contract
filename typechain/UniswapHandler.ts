@@ -3,48 +3,29 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumber,
   BigNumberish,
   BytesLike,
-  CallOverrides,
-  ContractTransaction,
-  Overrides,
-  PayableOverrides,
-  PopulatedTransaction,
-  Signer,
-  utils,
-} from "ethers";
-import type {
   FunctionFragment,
   Result,
+  Interface,
   EventFragment,
-} from "@ethersproject/abi";
-import type { Listener, Provider } from "@ethersproject/providers";
+  AddressLike,
+  ContractRunner,
+  ContractMethod,
+  Listener,
+} from "ethers";
 import type {
-  TypedEventFilter,
-  TypedEvent,
+  TypedContractEvent,
+  TypedDeferredTopicFilter,
+  TypedEventLog,
+  TypedLogDescription,
   TypedListener,
-  OnEvent,
+  TypedContractMethod,
 } from "./common";
 
-export interface UniswapHandlerInterface extends utils.Interface {
-  functions: {
-    "addLiquidity(address,uint256,uint256,uint256)": FunctionFragment;
-    "createPair(address)": FunctionFragment;
-    "getLiquidityInfo(address)": FunctionFragment;
-    "liquidityInfo(address)": FunctionFragment;
-    "owner()": FunctionFragment;
-    "pairExists(address)": FunctionFragment;
-    "renounceOwnership()": FunctionFragment;
-    "transferLPTokens(address)": FunctionFragment;
-    "transferOwnership(address)": FunctionFragment;
-    "uniswapFactoryAddress()": FunctionFragment;
-    "uniswapRouterAddress()": FunctionFragment;
-    "wethAddress()": FunctionFragment;
-  };
-
+export interface UniswapHandlerInterface extends Interface {
   getFunction(
-    nameOrSignatureOrTopic:
+    nameOrSignature:
       | "addLiquidity"
       | "createPair"
       | "getLiquidityInfo"
@@ -59,32 +40,45 @@ export interface UniswapHandlerInterface extends utils.Interface {
       | "wethAddress"
   ): FunctionFragment;
 
+  getEvent(
+    nameOrSignatureOrTopic:
+      | "LiquidityAdded"
+      | "LiquidityLocked"
+      | "OwnershipTransferred"
+  ): EventFragment;
+
   encodeFunctionData(
     functionFragment: "addLiquidity",
-    values: [string, BigNumberish, BigNumberish, BigNumberish]
+    values: [AddressLike, BigNumberish, BigNumberish, BigNumberish]
   ): string;
-  encodeFunctionData(functionFragment: "createPair", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "createPair",
+    values: [AddressLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "getLiquidityInfo",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "liquidityInfo",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(functionFragment: "owner", values?: undefined): string;
-  encodeFunctionData(functionFragment: "pairExists", values: [string]): string;
+  encodeFunctionData(
+    functionFragment: "pairExists",
+    values: [AddressLike]
+  ): string;
   encodeFunctionData(
     functionFragment: "renounceOwnership",
     values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "transferLPTokens",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "transferOwnership",
-    values: [string]
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "uniswapFactoryAddress",
@@ -138,412 +132,312 @@ export interface UniswapHandlerInterface extends utils.Interface {
     functionFragment: "wethAddress",
     data: BytesLike
   ): Result;
-
-  events: {
-    "LiquidityAdded(address,address,uint256,uint256,uint256)": EventFragment;
-    "LiquidityLocked(address,address,uint256,uint256)": EventFragment;
-    "OwnershipTransferred(address,address)": EventFragment;
-  };
-
-  getEvent(nameOrSignatureOrTopic: "LiquidityAdded"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "LiquidityLocked"): EventFragment;
-  getEvent(nameOrSignatureOrTopic: "OwnershipTransferred"): EventFragment;
 }
 
-export interface LiquidityAddedEventObject {
-  token: string;
-  pair: string;
-  amountToken: BigNumber;
-  amountETH: BigNumber;
-  liquidity: BigNumber;
+export namespace LiquidityAddedEvent {
+  export type InputTuple = [
+    token: AddressLike,
+    pair: AddressLike,
+    amountToken: BigNumberish,
+    amountETH: BigNumberish,
+    liquidity: BigNumberish
+  ];
+  export type OutputTuple = [
+    token: string,
+    pair: string,
+    amountToken: bigint,
+    amountETH: bigint,
+    liquidity: bigint
+  ];
+  export interface OutputObject {
+    token: string;
+    pair: string;
+    amountToken: bigint;
+    amountETH: bigint;
+    liquidity: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type LiquidityAddedEvent = TypedEvent<
-  [string, string, BigNumber, BigNumber, BigNumber],
-  LiquidityAddedEventObject
->;
 
-export type LiquidityAddedEventFilter = TypedEventFilter<LiquidityAddedEvent>;
-
-export interface LiquidityLockedEventObject {
-  token: string;
-  pair: string;
-  lockPeriod: BigNumber;
-  unlockTime: BigNumber;
+export namespace LiquidityLockedEvent {
+  export type InputTuple = [
+    token: AddressLike,
+    pair: AddressLike,
+    lockPeriod: BigNumberish,
+    unlockTime: BigNumberish
+  ];
+  export type OutputTuple = [
+    token: string,
+    pair: string,
+    lockPeriod: bigint,
+    unlockTime: bigint
+  ];
+  export interface OutputObject {
+    token: string;
+    pair: string;
+    lockPeriod: bigint;
+    unlockTime: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type LiquidityLockedEvent = TypedEvent<
-  [string, string, BigNumber, BigNumber],
-  LiquidityLockedEventObject
->;
 
-export type LiquidityLockedEventFilter = TypedEventFilter<LiquidityLockedEvent>;
-
-export interface OwnershipTransferredEventObject {
-  previousOwner: string;
-  newOwner: string;
+export namespace OwnershipTransferredEvent {
+  export type InputTuple = [previousOwner: AddressLike, newOwner: AddressLike];
+  export type OutputTuple = [previousOwner: string, newOwner: string];
+  export interface OutputObject {
+    previousOwner: string;
+    newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
-export type OwnershipTransferredEvent = TypedEvent<
-  [string, string],
-  OwnershipTransferredEventObject
->;
-
-export type OwnershipTransferredEventFilter =
-  TypedEventFilter<OwnershipTransferredEvent>;
 
 export interface UniswapHandler extends BaseContract {
-  connect(signerOrProvider: Signer | Provider | string): this;
-  attach(addressOrName: string): this;
-  deployed(): Promise<this>;
+  connect(runner?: ContractRunner | null): UniswapHandler;
+  waitForDeployment(): Promise<this>;
 
   interface: UniswapHandlerInterface;
 
-  queryFilter<TEvent extends TypedEvent>(
-    event: TypedEventFilter<TEvent>,
+  queryFilter<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
     fromBlockOrBlockhash?: string | number | undefined,
     toBlock?: string | number | undefined
-  ): Promise<Array<TEvent>>;
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
+  queryFilter<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    fromBlockOrBlockhash?: string | number | undefined,
+    toBlock?: string | number | undefined
+  ): Promise<Array<TypedEventLog<TCEvent>>>;
 
-  listeners<TEvent extends TypedEvent>(
-    eventFilter?: TypedEventFilter<TEvent>
-  ): Array<TypedListener<TEvent>>;
-  listeners(eventName?: string): Array<Listener>;
-  removeAllListeners<TEvent extends TypedEvent>(
-    eventFilter: TypedEventFilter<TEvent>
-  ): this;
-  removeAllListeners(eventName?: string): this;
-  off: OnEvent<this>;
-  on: OnEvent<this>;
-  once: OnEvent<this>;
-  removeListener: OnEvent<this>;
+  on<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  on<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
 
-  functions: {
-    addLiquidity(
-      tokenAddress: string,
+  once<TCEvent extends TypedContractEvent>(
+    event: TCEvent,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+  once<TCEvent extends TypedContractEvent>(
+    filter: TypedDeferredTopicFilter<TCEvent>,
+    listener: TypedListener<TCEvent>
+  ): Promise<this>;
+
+  listeners<TCEvent extends TypedContractEvent>(
+    event: TCEvent
+  ): Promise<Array<TypedListener<TCEvent>>>;
+  listeners(eventName?: string): Promise<Array<Listener>>;
+  removeAllListeners<TCEvent extends TypedContractEvent>(
+    event?: TCEvent
+  ): Promise<this>;
+
+  addLiquidity: TypedContractMethod<
+    [
+      tokenAddress: AddressLike,
       tokenAmount: BigNumberish,
       ethAmount: BigNumberish,
-      lockPeriod: BigNumberish,
-      overrides?: PayableOverrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    createPair(
-      tokenAddress: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    getLiquidityInfo(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, boolean, BigNumber, BigNumber] & {
-        pair: string;
-        isLocked: boolean;
-        unlockTime: BigNumber;
-        lpBalance: BigNumber;
-      }
-    >;
-
-    liquidityInfo(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, boolean, BigNumber] & {
-        pair: string;
-        isLocked: boolean;
-        unlockTime: BigNumber;
-      }
-    >;
-
-    owner(overrides?: CallOverrides): Promise<[string]>;
-
-    pairExists(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<[boolean] & { exists: boolean }>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    transferLPTokens(
-      tokenAddress: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<ContractTransaction>;
-
-    uniswapFactoryAddress(overrides?: CallOverrides): Promise<[string]>;
-
-    uniswapRouterAddress(overrides?: CallOverrides): Promise<[string]>;
-
-    wethAddress(overrides?: CallOverrides): Promise<[string]>;
-  };
-
-  addLiquidity(
-    tokenAddress: string,
-    tokenAmount: BigNumberish,
-    ethAmount: BigNumberish,
-    lockPeriod: BigNumberish,
-    overrides?: PayableOverrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  createPair(
-    tokenAddress: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
-
-  getLiquidityInfo(
-    tokenAddress: string,
-    overrides?: CallOverrides
-  ): Promise<
-    [string, boolean, BigNumber, BigNumber] & {
-      pair: string;
-      isLocked: boolean;
-      unlockTime: BigNumber;
-      lpBalance: BigNumber;
-    }
+      lockPeriod: BigNumberish
+    ],
+    [bigint],
+    "payable"
   >;
 
-  liquidityInfo(
-    arg0: string,
-    overrides?: CallOverrides
-  ): Promise<
-    [string, boolean, BigNumber] & {
-      pair: string;
-      isLocked: boolean;
-      unlockTime: BigNumber;
-    }
+  createPair: TypedContractMethod<
+    [tokenAddress: AddressLike],
+    [string],
+    "nonpayable"
   >;
 
-  owner(overrides?: CallOverrides): Promise<string>;
+  getLiquidityInfo: TypedContractMethod<
+    [tokenAddress: AddressLike],
+    [
+      [string, boolean, bigint, bigint] & {
+        pair: string;
+        isLocked: boolean;
+        unlockTime: bigint;
+        lpBalance: bigint;
+      }
+    ],
+    "view"
+  >;
 
-  pairExists(tokenAddress: string, overrides?: CallOverrides): Promise<boolean>;
+  liquidityInfo: TypedContractMethod<
+    [arg0: AddressLike],
+    [
+      [string, boolean, bigint] & {
+        pair: string;
+        isLocked: boolean;
+        unlockTime: bigint;
+      }
+    ],
+    "view"
+  >;
 
-  renounceOwnership(
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  owner: TypedContractMethod<[], [string], "view">;
 
-  transferLPTokens(
-    tokenAddress: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  pairExists: TypedContractMethod<
+    [tokenAddress: AddressLike],
+    [boolean],
+    "view"
+  >;
 
-  transferOwnership(
-    newOwner: string,
-    overrides?: Overrides & { from?: string }
-  ): Promise<ContractTransaction>;
+  renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
-  uniswapFactoryAddress(overrides?: CallOverrides): Promise<string>;
+  transferLPTokens: TypedContractMethod<
+    [tokenAddress: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-  uniswapRouterAddress(overrides?: CallOverrides): Promise<string>;
+  transferOwnership: TypedContractMethod<
+    [newOwner: AddressLike],
+    [void],
+    "nonpayable"
+  >;
 
-  wethAddress(overrides?: CallOverrides): Promise<string>;
+  uniswapFactoryAddress: TypedContractMethod<[], [string], "view">;
 
-  callStatic: {
-    addLiquidity(
-      tokenAddress: string,
+  uniswapRouterAddress: TypedContractMethod<[], [string], "view">;
+
+  wethAddress: TypedContractMethod<[], [string], "view">;
+
+  getFunction<T extends ContractMethod = ContractMethod>(
+    key: string | FunctionFragment
+  ): T;
+
+  getFunction(
+    nameOrSignature: "addLiquidity"
+  ): TypedContractMethod<
+    [
+      tokenAddress: AddressLike,
       tokenAmount: BigNumberish,
       ethAmount: BigNumberish,
-      lockPeriod: BigNumberish,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    createPair(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<string>;
-
-    getLiquidityInfo(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, boolean, BigNumber, BigNumber] & {
+      lockPeriod: BigNumberish
+    ],
+    [bigint],
+    "payable"
+  >;
+  getFunction(
+    nameOrSignature: "createPair"
+  ): TypedContractMethod<[tokenAddress: AddressLike], [string], "nonpayable">;
+  getFunction(
+    nameOrSignature: "getLiquidityInfo"
+  ): TypedContractMethod<
+    [tokenAddress: AddressLike],
+    [
+      [string, boolean, bigint, bigint] & {
         pair: string;
         isLocked: boolean;
-        unlockTime: BigNumber;
-        lpBalance: BigNumber;
+        unlockTime: bigint;
+        lpBalance: bigint;
       }
-    >;
-
-    liquidityInfo(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<
-      [string, boolean, BigNumber] & {
+    ],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "liquidityInfo"
+  ): TypedContractMethod<
+    [arg0: AddressLike],
+    [
+      [string, boolean, bigint] & {
         pair: string;
         isLocked: boolean;
-        unlockTime: BigNumber;
+        unlockTime: bigint;
       }
-    >;
+    ],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "owner"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "pairExists"
+  ): TypedContractMethod<[tokenAddress: AddressLike], [boolean], "view">;
+  getFunction(
+    nameOrSignature: "renounceOwnership"
+  ): TypedContractMethod<[], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "transferLPTokens"
+  ): TypedContractMethod<[tokenAddress: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "transferOwnership"
+  ): TypedContractMethod<[newOwner: AddressLike], [void], "nonpayable">;
+  getFunction(
+    nameOrSignature: "uniswapFactoryAddress"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "uniswapRouterAddress"
+  ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "wethAddress"
+  ): TypedContractMethod<[], [string], "view">;
 
-    owner(overrides?: CallOverrides): Promise<string>;
-
-    pairExists(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<boolean>;
-
-    renounceOwnership(overrides?: CallOverrides): Promise<void>;
-
-    transferLPTokens(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: CallOverrides
-    ): Promise<void>;
-
-    uniswapFactoryAddress(overrides?: CallOverrides): Promise<string>;
-
-    uniswapRouterAddress(overrides?: CallOverrides): Promise<string>;
-
-    wethAddress(overrides?: CallOverrides): Promise<string>;
-  };
+  getEvent(
+    key: "LiquidityAdded"
+  ): TypedContractEvent<
+    LiquidityAddedEvent.InputTuple,
+    LiquidityAddedEvent.OutputTuple,
+    LiquidityAddedEvent.OutputObject
+  >;
+  getEvent(
+    key: "LiquidityLocked"
+  ): TypedContractEvent<
+    LiquidityLockedEvent.InputTuple,
+    LiquidityLockedEvent.OutputTuple,
+    LiquidityLockedEvent.OutputObject
+  >;
+  getEvent(
+    key: "OwnershipTransferred"
+  ): TypedContractEvent<
+    OwnershipTransferredEvent.InputTuple,
+    OwnershipTransferredEvent.OutputTuple,
+    OwnershipTransferredEvent.OutputObject
+  >;
 
   filters: {
-    "LiquidityAdded(address,address,uint256,uint256,uint256)"(
-      token?: string | null,
-      pair?: string | null,
-      amountToken?: null,
-      amountETH?: null,
-      liquidity?: null
-    ): LiquidityAddedEventFilter;
-    LiquidityAdded(
-      token?: string | null,
-      pair?: string | null,
-      amountToken?: null,
-      amountETH?: null,
-      liquidity?: null
-    ): LiquidityAddedEventFilter;
+    "LiquidityAdded(address,address,uint256,uint256,uint256)": TypedContractEvent<
+      LiquidityAddedEvent.InputTuple,
+      LiquidityAddedEvent.OutputTuple,
+      LiquidityAddedEvent.OutputObject
+    >;
+    LiquidityAdded: TypedContractEvent<
+      LiquidityAddedEvent.InputTuple,
+      LiquidityAddedEvent.OutputTuple,
+      LiquidityAddedEvent.OutputObject
+    >;
 
-    "LiquidityLocked(address,address,uint256,uint256)"(
-      token?: string | null,
-      pair?: string | null,
-      lockPeriod?: null,
-      unlockTime?: null
-    ): LiquidityLockedEventFilter;
-    LiquidityLocked(
-      token?: string | null,
-      pair?: string | null,
-      lockPeriod?: null,
-      unlockTime?: null
-    ): LiquidityLockedEventFilter;
+    "LiquidityLocked(address,address,uint256,uint256)": TypedContractEvent<
+      LiquidityLockedEvent.InputTuple,
+      LiquidityLockedEvent.OutputTuple,
+      LiquidityLockedEvent.OutputObject
+    >;
+    LiquidityLocked: TypedContractEvent<
+      LiquidityLockedEvent.InputTuple,
+      LiquidityLockedEvent.OutputTuple,
+      LiquidityLockedEvent.OutputObject
+    >;
 
-    "OwnershipTransferred(address,address)"(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter;
-    OwnershipTransferred(
-      previousOwner?: string | null,
-      newOwner?: string | null
-    ): OwnershipTransferredEventFilter;
-  };
-
-  estimateGas: {
-    addLiquidity(
-      tokenAddress: string,
-      tokenAmount: BigNumberish,
-      ethAmount: BigNumberish,
-      lockPeriod: BigNumberish,
-      overrides?: PayableOverrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    createPair(
-      tokenAddress: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    getLiquidityInfo(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    liquidityInfo(arg0: string, overrides?: CallOverrides): Promise<BigNumber>;
-
-    owner(overrides?: CallOverrides): Promise<BigNumber>;
-
-    pairExists(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<BigNumber>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    transferLPTokens(
-      tokenAddress: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<BigNumber>;
-
-    uniswapFactoryAddress(overrides?: CallOverrides): Promise<BigNumber>;
-
-    uniswapRouterAddress(overrides?: CallOverrides): Promise<BigNumber>;
-
-    wethAddress(overrides?: CallOverrides): Promise<BigNumber>;
-  };
-
-  populateTransaction: {
-    addLiquidity(
-      tokenAddress: string,
-      tokenAmount: BigNumberish,
-      ethAmount: BigNumberish,
-      lockPeriod: BigNumberish,
-      overrides?: PayableOverrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    createPair(
-      tokenAddress: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    getLiquidityInfo(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    liquidityInfo(
-      arg0: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    owner(overrides?: CallOverrides): Promise<PopulatedTransaction>;
-
-    pairExists(
-      tokenAddress: string,
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    renounceOwnership(
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    transferLPTokens(
-      tokenAddress: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    transferOwnership(
-      newOwner: string,
-      overrides?: Overrides & { from?: string }
-    ): Promise<PopulatedTransaction>;
-
-    uniswapFactoryAddress(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    uniswapRouterAddress(
-      overrides?: CallOverrides
-    ): Promise<PopulatedTransaction>;
-
-    wethAddress(overrides?: CallOverrides): Promise<PopulatedTransaction>;
+    "OwnershipTransferred(address,address)": TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
+    OwnershipTransferred: TypedContractEvent<
+      OwnershipTransferredEvent.InputTuple,
+      OwnershipTransferredEvent.OutputTuple,
+      OwnershipTransferredEvent.OutputObject
+    >;
   };
 }

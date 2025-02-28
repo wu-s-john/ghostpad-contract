@@ -2,21 +2,21 @@
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/Initializable.sol";
 
 /**
  * @title TokenTemplate
  * @dev A template contract for creating new memecoin tokens
  * This contract will be cloned using the minimal proxy pattern for gas efficiency
  */
-contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
+contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
     
-    bool private initialized = false;
-    bool public contractLocked = false; // Whether certain functions are locked to prevent changes
+    bool public contractLocked; // Whether certain functions are locked to prevent changes
     
     // Description of the token
     string public description;
@@ -65,14 +65,6 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
     event VestingScheduleRevoked(bytes32 vestingScheduleId);
     event VestingReleased(bytes32 vestingScheduleId, uint256 amount);
     event TokenDistribution(uint256 ownerAmount, uint256 contractAmount, uint256 ownerPercentage);
-    
-    /**
-     * @dev Constructor
-     * Called when this contract is deployed, not when proxies are deployed
-     */
-    constructor() public ERC20("Template", "TEMP") {
-        // This constructor is only used for the original template, not the clones
-    }
     
     /**
      * @dev Calculate the percentage of tokens that should go to the owner based on ETH deposited
@@ -159,15 +151,16 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
         bool _burnEnabled,
         uint256 _liquidityLockPeriod,
         bool _vestingEnabled
-    ) external {
-        require(!initialized, "Contract already initialized");
+    ) external initializer {
         require(owner != address(0), "Owner cannot be the zero address");
         
-        // Initialize ERC20
-        super._setupDecimals(18);
+        // Initialize base contracts
+        __ERC20_init(name, symbol);
+        __Ownable_init();
+        __ReentrancyGuard_init();
         
-        // Since we can't set name and symbol directly as they're immutable in ERC20,
-        // we'll use the values in the UI layer instead of the contract
+        // Set decimals
+        _setupDecimals(18);
         
         // Determine the ETH amount based on the caller contract
         uint256 ethAmount = 0;
@@ -216,8 +209,7 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
         burnEnabled = _burnEnabled;
         liquidityLockPeriod = _liquidityLockPeriod;
         vestingEnabled = _vestingEnabled;
-        
-        initialized = true;
+        contractLocked = false;
         
         emit Initialized(name, symbol, initialSupply, owner);
     }
@@ -580,7 +572,7 @@ contract TokenTemplate is ERC20, Ownable, ReentrancyGuard {
         if (token == address(0)) {
             payable(owner()).transfer(amount);
         } else {
-            IERC20(token).transfer(owner(), amount);
+            IERC20Upgradeable(token).transfer(owner(), amount);
         }
     }
     
