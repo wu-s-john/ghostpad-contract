@@ -231,7 +231,6 @@ contract GhostPad is Ownable {
         ProofData memory proofData
     ) external payable returns (address tokenAddress) {
         require(proofData.instanceIndex < tornadoInstances.length, "Instance index out of bounds");
-        require(tokenData.liquidityTokenAmount > 0, "Liquidity token amount must be greater than 0");
         
         // Make sure the recipient is this contract so it receives the ETH from Tornado
         proofData.recipient = payable(address(this));
@@ -251,8 +250,11 @@ contract GhostPad is Ownable {
             proofData
         );
         
-        // Add liquidity using the ETH received from Tornado
-        _addLiquidity(tokenAddress, tokenData.liquidityTokenAmount, liquidityEthAmount);
+        // Get the actual token balance of this contract to use for liquidity
+        uint256 actualTokenBalance = IERC20(tokenAddress).balanceOf(address(this));
+        
+        // Add liquidity using the ETH received from Tornado and all tokens this contract holds
+        _addLiquidity(tokenAddress, liquidityEthAmount);
         
         return tokenAddress;
     }
@@ -262,18 +264,20 @@ contract GhostPad is Ownable {
      */
     function _addLiquidity(
         address tokenAddress,
-        uint256 liquidityTokenAmount, 
         uint256 liquidityEthAmount
     ) private returns (uint256 liquidity) {
-        if (liquidityTokenAmount > 0 && liquidityEthAmount > 0) {
+        // Get the current token balance of this contract
+        uint256 tokenAmount = IERC20(tokenAddress).balanceOf(address(this));
+        
+        if (tokenAmount > 0 && liquidityEthAmount > 0) {
             // Approve tokens for the Uniswap handler
-            IERC20(tokenAddress).approve(uniswapHandler, liquidityTokenAmount);
+            IERC20(tokenAddress).approve(uniswapHandler, tokenAmount);
             
             // Create liquidity pool
             UniswapHandler uniswapHandlerContract = UniswapHandler(payable(uniswapHandler));
             liquidity = uniswapHandlerContract.addLiquidity{value: liquidityEthAmount}(
                 tokenAddress,
-                liquidityTokenAmount,
+                tokenAmount,
                 liquidityEthAmount,
                 0 // We'll get the lock period from the token
             );
@@ -384,7 +388,6 @@ contract GhostPad is Ownable {
         string description;
         bool burnEnabled;
         uint256 liquidityLockPeriod;
-        uint256 liquidityTokenAmount;
         bool useProtocolFee;
         bool vestingEnabled;
     }

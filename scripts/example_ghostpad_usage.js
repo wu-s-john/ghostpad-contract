@@ -226,8 +226,7 @@ module.exports = async function() {
     const uniswapHandler = await UniswapHandler.deployed();
     console.log(`UniswapHandler address: ${uniswapHandler.address}`);
     
-    // Set up liquidity parameters
-    const liquidityTokenAmount = web3.utils.toWei('100000'); // 10% of supply for liquidity
+    // Set up liquidity parameters - removed liquidityTokenAmount as it's no longer needed
     const liquidityEthAmount = web3.utils.toWei('1'); // 1 ETH for liquidity
     
     // Calculate total ETH needed (liquidity + refund)
@@ -253,7 +252,7 @@ module.exports = async function() {
       taxRecipient,
       burnEnabled,
       liquidityLockPeriod,
-      liquidityTokenAmount,
+      // liquidityTokenAmount, - removed as it's no longer needed
       liquidityEthAmount,
       useProtocolFee,
       vestingEnabled,

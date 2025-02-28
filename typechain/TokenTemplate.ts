@@ -92,16 +92,12 @@ export interface TokenTemplateInterface extends Interface {
       | "revoke"
       | "setBurnEnabled"
       | "symbol"
-      | "taxRate"
-      | "taxRecipient"
       | "totalSupply"
       | "transfer"
       | "transferFrom"
       | "transferOwnership"
       | "unlockLiquidity"
       | "updateDescription"
-      | "updateTaxRate"
-      | "updateTaxRecipient"
       | "vestingEnabled"
       | "withdrawToken"
   ): FunctionFragment;
@@ -116,8 +112,6 @@ export interface TokenTemplateInterface extends Interface {
       | "LiquidityLocked"
       | "LiquidityUnlocked"
       | "OwnershipTransferred"
-      | "TaxRateUpdated"
-      | "TaxRecipientUpdated"
       | "TokenDistribution"
       | "Transfer"
       | "VestingReleased"
@@ -210,11 +204,10 @@ export interface TokenTemplateInterface extends Interface {
       BigNumberish,
       AddressLike,
       string,
-      BigNumberish,
-      AddressLike,
       boolean,
       BigNumberish,
-      boolean
+      boolean,
+      BigNumberish
     ]
   ): string;
   encodeFunctionData(
@@ -257,11 +250,6 @@ export interface TokenTemplateInterface extends Interface {
     values: [boolean]
   ): string;
   encodeFunctionData(functionFragment: "symbol", values?: undefined): string;
-  encodeFunctionData(functionFragment: "taxRate", values?: undefined): string;
-  encodeFunctionData(
-    functionFragment: "taxRecipient",
-    values?: undefined
-  ): string;
   encodeFunctionData(
     functionFragment: "totalSupply",
     values?: undefined
@@ -285,14 +273,6 @@ export interface TokenTemplateInterface extends Interface {
   encodeFunctionData(
     functionFragment: "updateDescription",
     values: [string]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "updateTaxRate",
-    values: [BigNumberish]
-  ): string;
-  encodeFunctionData(
-    functionFragment: "updateTaxRecipient",
-    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "vestingEnabled",
@@ -396,11 +376,6 @@ export interface TokenTemplateInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "symbol", data: BytesLike): Result;
-  decodeFunctionResult(functionFragment: "taxRate", data: BytesLike): Result;
-  decodeFunctionResult(
-    functionFragment: "taxRecipient",
-    data: BytesLike
-  ): Result;
   decodeFunctionResult(
     functionFragment: "totalSupply",
     data: BytesLike
@@ -420,14 +395,6 @@ export interface TokenTemplateInterface extends Interface {
   ): Result;
   decodeFunctionResult(
     functionFragment: "updateDescription",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "updateTaxRate",
-    data: BytesLike
-  ): Result;
-  decodeFunctionResult(
-    functionFragment: "updateTaxRecipient",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -554,35 +521,6 @@ export namespace OwnershipTransferredEvent {
   export interface OutputObject {
     previousOwner: string;
     newOwner: string;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace TaxRateUpdatedEvent {
-  export type InputTuple = [oldRate: BigNumberish, newRate: BigNumberish];
-  export type OutputTuple = [oldRate: bigint, newRate: bigint];
-  export interface OutputObject {
-    oldRate: bigint;
-    newRate: bigint;
-  }
-  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
-  export type Filter = TypedDeferredTopicFilter<Event>;
-  export type Log = TypedEventLog<Event>;
-  export type LogDescription = TypedLogDescription<Event>;
-}
-
-export namespace TaxRecipientUpdatedEvent {
-  export type InputTuple = [
-    oldRecipient: AddressLike,
-    newRecipient: AddressLike
-  ];
-  export type OutputTuple = [oldRecipient: string, newRecipient: string];
-  export interface OutputObject {
-    oldRecipient: string;
-    newRecipient: string;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -825,11 +763,10 @@ export interface TokenTemplate extends BaseContract {
       initialSupply: BigNumberish,
       owner: AddressLike,
       _description: string,
-      _taxRate: BigNumberish,
-      _taxRecipient: AddressLike,
       _burnEnabled: boolean,
       _liquidityLockPeriod: BigNumberish,
-      _vestingEnabled: boolean
+      _vestingEnabled: boolean,
+      _ethAmount: BigNumberish
     ],
     [void],
     "nonpayable"
@@ -877,10 +814,6 @@ export interface TokenTemplate extends BaseContract {
 
   symbol: TypedContractMethod<[], [string], "view">;
 
-  taxRate: TypedContractMethod<[], [bigint], "view">;
-
-  taxRecipient: TypedContractMethod<[], [string], "view">;
-
   totalSupply: TypedContractMethod<[], [bigint], "view">;
 
   transfer: TypedContractMethod<
@@ -905,18 +838,6 @@ export interface TokenTemplate extends BaseContract {
 
   updateDescription: TypedContractMethod<
     [newDescription: string],
-    [void],
-    "nonpayable"
-  >;
-
-  updateTaxRate: TypedContractMethod<
-    [newTaxRate: BigNumberish],
-    [void],
-    "nonpayable"
-  >;
-
-  updateTaxRecipient: TypedContractMethod<
-    [newTaxRecipient: AddressLike],
     [void],
     "nonpayable"
   >;
@@ -1038,11 +959,10 @@ export interface TokenTemplate extends BaseContract {
       initialSupply: BigNumberish,
       owner: AddressLike,
       _description: string,
-      _taxRate: BigNumberish,
-      _taxRecipient: AddressLike,
       _burnEnabled: boolean,
       _liquidityLockPeriod: BigNumberish,
-      _vestingEnabled: boolean
+      _vestingEnabled: boolean,
+      _ethAmount: BigNumberish
     ],
     [void],
     "nonpayable"
@@ -1095,12 +1015,6 @@ export interface TokenTemplate extends BaseContract {
     nameOrSignature: "symbol"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
-    nameOrSignature: "taxRate"
-  ): TypedContractMethod<[], [bigint], "view">;
-  getFunction(
-    nameOrSignature: "taxRecipient"
-  ): TypedContractMethod<[], [string], "view">;
-  getFunction(
     nameOrSignature: "totalSupply"
   ): TypedContractMethod<[], [bigint], "view">;
   getFunction(
@@ -1126,12 +1040,6 @@ export interface TokenTemplate extends BaseContract {
   getFunction(
     nameOrSignature: "updateDescription"
   ): TypedContractMethod<[newDescription: string], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "updateTaxRate"
-  ): TypedContractMethod<[newTaxRate: BigNumberish], [void], "nonpayable">;
-  getFunction(
-    nameOrSignature: "updateTaxRecipient"
-  ): TypedContractMethod<[newTaxRecipient: AddressLike], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "vestingEnabled"
   ): TypedContractMethod<[], [boolean], "view">;
@@ -1198,20 +1106,6 @@ export interface TokenTemplate extends BaseContract {
     OwnershipTransferredEvent.InputTuple,
     OwnershipTransferredEvent.OutputTuple,
     OwnershipTransferredEvent.OutputObject
-  >;
-  getEvent(
-    key: "TaxRateUpdated"
-  ): TypedContractEvent<
-    TaxRateUpdatedEvent.InputTuple,
-    TaxRateUpdatedEvent.OutputTuple,
-    TaxRateUpdatedEvent.OutputObject
-  >;
-  getEvent(
-    key: "TaxRecipientUpdated"
-  ): TypedContractEvent<
-    TaxRecipientUpdatedEvent.InputTuple,
-    TaxRecipientUpdatedEvent.OutputTuple,
-    TaxRecipientUpdatedEvent.OutputObject
   >;
   getEvent(
     key: "TokenDistribution"
@@ -1336,28 +1230,6 @@ export interface TokenTemplate extends BaseContract {
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,
       OwnershipTransferredEvent.OutputObject
-    >;
-
-    "TaxRateUpdated(uint256,uint256)": TypedContractEvent<
-      TaxRateUpdatedEvent.InputTuple,
-      TaxRateUpdatedEvent.OutputTuple,
-      TaxRateUpdatedEvent.OutputObject
-    >;
-    TaxRateUpdated: TypedContractEvent<
-      TaxRateUpdatedEvent.InputTuple,
-      TaxRateUpdatedEvent.OutputTuple,
-      TaxRateUpdatedEvent.OutputObject
-    >;
-
-    "TaxRecipientUpdated(address,address)": TypedContractEvent<
-      TaxRecipientUpdatedEvent.InputTuple,
-      TaxRecipientUpdatedEvent.OutputTuple,
-      TaxRecipientUpdatedEvent.OutputObject
-    >;
-    TaxRecipientUpdated: TypedContractEvent<
-      TaxRecipientUpdatedEvent.InputTuple,
-      TaxRecipientUpdatedEvent.OutputTuple,
-      TaxRecipientUpdatedEvent.OutputObject
     >;
 
     "TokenDistribution(uint256,uint256,uint256)": TypedContractEvent<

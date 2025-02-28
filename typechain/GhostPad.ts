@@ -29,8 +29,6 @@ export declare namespace GhostPad {
     symbol: string;
     initialSupply: BigNumberish;
     description: string;
-    taxRate: BigNumberish;
-    taxRecipient: AddressLike;
     burnEnabled: boolean;
     liquidityLockPeriod: BigNumberish;
     liquidityTokenAmount: BigNumberish;
@@ -43,8 +41,6 @@ export declare namespace GhostPad {
     symbol: string,
     initialSupply: bigint,
     description: string,
-    taxRate: bigint,
-    taxRecipient: string,
     burnEnabled: boolean,
     liquidityLockPeriod: bigint,
     liquidityTokenAmount: bigint,
@@ -55,8 +51,6 @@ export declare namespace GhostPad {
     symbol: string;
     initialSupply: bigint;
     description: string;
-    taxRate: bigint;
-    taxRecipient: string;
     burnEnabled: boolean;
     liquidityLockPeriod: bigint;
     liquidityTokenAmount: bigint;

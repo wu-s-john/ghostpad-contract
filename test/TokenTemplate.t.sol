@@ -196,15 +196,23 @@ contract TokenTemplateTest is Test {
         console.log("Owner percentage for 10 ETH:", percentage10ETH);
         console.log("Owner percentage for 100 ETH:", percentage100ETH);
         
-        // Verify the percentages follow the expected pattern
-        // Higher ETH amounts should result in higher owner percentages
+        // Verify the percentages follow the step function in the contract
+        // According to the implementation:
+        // 0.1 ETH -> 375 (3.75%)
+        // 1 ETH -> 500 (5%)
+        // 10 ETH -> 1000 (10%)
+        // 100 ETH -> 5000 (50%)
         
-        // At least one should increase as ETH increases
-        bool increasing = percentage0_1ETH < percentage1ETH || 
-                          percentage1ETH < percentage10ETH || 
-                          percentage10ETH < percentage100ETH;
+        // Check exact values based on the step function
+        assertEq(percentage0_1ETH, 375);
+        assertEq(percentage1ETH, 500);
+        assertEq(percentage10ETH, 1000);
+        assertEq(percentage100ETH, 5000);
         
-        assertTrue(increasing, "Owner percentage should generally increase with higher ETH amounts");
+        // Also verify the step function's general behavior
+        assertTrue(percentage0_1ETH < percentage1ETH, "0.1 ETH should give smaller percentage than 1 ETH");
+        assertTrue(percentage1ETH < percentage10ETH, "1 ETH should give smaller percentage than 10 ETH");
+        assertTrue(percentage10ETH < percentage100ETH, "10 ETH should give smaller percentage than 100 ETH");
     }
 
     function testMultipleTransfers() public {
