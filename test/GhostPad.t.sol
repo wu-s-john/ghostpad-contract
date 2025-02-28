@@ -275,4 +275,91 @@ contract GhostPadTest is Test {
         uint256 user1FinalBalance = deployedToken.balanceOf(user1);
         assertEq(user1FinalBalance, user1InitialBalance - transferAmount1);
     }
+
+    // Test deploying a token with liquidity and then having someone purchase tokens
+    function testDeployTokenWithLiquidityAndPurchase() public {
+        // First make deposits into Tornado to build up its balance
+        bytes32 commitment = generateCommitment();
+        
+        // Give user1 ETH for deposit and for calling deployTokenWithLiquidity
+        vm.deal(user1, 2 ether); // 1 ETH for deposit + 1 ETH for refund and gas
+        
+        // User1 makes the deposit
+        vm.prank(user1);
+        mockTornadoInstance.deposit{value: 1 ether}(commitment);
+        
+        // Create test data
+        GhostPad.TokenData memory tokenData = createTestTokenData();
+        GhostPad.ProofData memory proofData = createTestProofData();
+        
+        // Deploy token with liquidity - user1 calls this function now
+        vm.prank(user1);
+        address payable tokenAddress = payable(ghostPad.deployTokenWithLiquidity{value: proofData.refund}(
+            tokenData,
+            proofData
+        ));
+        
+        // Create a new buyer account
+        address buyer = address(0x4); // New address
+        vm.deal(buyer, 1 ether); // Give buyer 1 ETH for purchase
+        
+        // Get the token contract
+        TokenTemplate token = TokenTemplate(tokenAddress);
+        
+        // Check initial balances
+        uint256 buyerInitialTokenBalance = token.balanceOf(buyer);
+        assertEq(buyerInitialTokenBalance, 0, "Buyer should start with 0 tokens");
+        
+        // Get liquidity info to check ETH in the pool
+        (address pairAddress, bool isLocked, uint256 unlockTime, uint256 lpBalance) = 
+            uniswapHandler.getLiquidityInfo(tokenAddress);
+            
+        // Verify liquidity is set up correctly
+        assertTrue(pairAddress != address(0), "Pair should exist");
+        assertTrue(isLocked, "Liquidity should be locked");
+        assertTrue(lpBalance > 0, "LP tokens should exist");
+        
+        // Set up path for swap
+        address[] memory path = new address[](2);
+        path[0] = weth;
+        path[1] = tokenAddress;
+        
+        // Execute token purchase
+        uint256 swapAmount = 0.1 ether;
+        
+        // Simulate buyer interacting with the router to buy tokens
+        vm.startPrank(buyer);
+        
+        // Mock the swap - in a real environment, this would call the actual router
+        // Here we're using a mock router for testing
+        MockUniswapRouter(payable(mockRouterAddress)).swapExactETHForTokens{value: swapAmount}(
+            0, // min amount out (accept any amount for testing)
+            path,
+            buyer,
+            block.timestamp + 3600 // deadline: 1 hour from now
+        );
+        
+        vm.stopPrank();
+        
+        // Check buyer's token balance after purchase
+        uint256 buyerFinalTokenBalance = token.balanceOf(buyer);
+        assertTrue(buyerFinalTokenBalance > 0, "Buyer should have received tokens");
+        console.log("Buyer received token amount:", buyerFinalTokenBalance / 10**18);
+        
+        // Check that the ETH made it to the pair (in a real environment)
+        // In our mock setup, we'll verify the router received the ETH
+        uint256 routerBalance = address(mockRouter).balance;
+        assertTrue(routerBalance >= swapAmount, "Router should have received ETH from the swap");
+        
+        // Get updated liquidity info
+        (pairAddress, isLocked, unlockTime, lpBalance) = 
+            uniswapHandler.getLiquidityInfo(tokenAddress);
+            
+        // The LP balance should still be the same as tokens are exchanged within the pair
+        assertEq(lpBalance, 1000000, "LP token amount should not change from swaps");
+        
+        // In a real environment, we would check the reserves of the pair
+        // But for our mock, we'll just verify the token transfer happened
+        console.log("Test passed: Token purchase successful");
+    }
 } 

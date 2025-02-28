@@ -2,6 +2,8 @@
 pragma solidity 0.7.6;
 pragma abicoder v2;
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 // Mock Uniswap Router for testing
 contract MockUniswapRouter {
     address public factory;
@@ -55,15 +57,16 @@ contract MockUniswapRouter {
         require(path.length >= 2, "Invalid path");
         require(path[0] == WETH, "Path must start with WETH");
         
-        address payable token = payable(path[1]);
-        uint256 tokenAmount = calculateSwapAmount(msg.value, address(token));
+        address token = path[1];
+        uint256 tokenAmount = calculateSwapAmount(msg.value, token);
         
         // Update reserves
         ethReserves += msg.value;
-        tokenReserves[address(token)] -= tokenAmount;
         
-        // We won't actually do the transfer since it's mocked
-        // TokenTemplate(token).transfer(to, tokenAmount);
+        // Actually transfer tokens to the buyer - this is what was missing!
+        // We simulate this by transferring tokens from the reserves
+        bool success = IERC20(token).transfer(to, tokenAmount);
+        require(success, "Token transfer failed");
         
         // Return amounts array
         amounts = new uint256[](path.length);
