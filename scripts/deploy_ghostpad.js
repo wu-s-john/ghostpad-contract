@@ -1,5 +1,4 @@
 const TokenTemplate = artifacts.require("TokenTemplate");
-const MetadataVerifier = artifacts.require("MetadataVerifier");
 const GhostPad = artifacts.require("GhostPad");
 const UniswapHandler = artifacts.require("UniswapHandler");
 
@@ -28,12 +27,6 @@ module.exports = async function(deployer, network, accounts) {
   await deployer.deploy(TokenTemplate);
   const tokenTemplate = await TokenTemplate.deployed();
   console.log(`TokenTemplate deployed at: ${tokenTemplate.address}`);
-  
-  // Step 2: Deploy the metadata verifier
-  console.log("Deploying MetadataVerifier...");
-  await deployer.deploy(MetadataVerifier);
-  const metadataVerifier = await MetadataVerifier.deployed();
-  console.log(`MetadataVerifier deployed at: ${metadataVerifier.address}`);
   
   // Deploy Hasher and Verifier (needed for Tornado)
   console.log("Deploying Hasher and Verifier for Tornado instances...");
@@ -103,7 +96,6 @@ module.exports = async function(deployer, network, accounts) {
     GhostPad,
     tokenTemplate.address,
     governance,
-    metadataVerifier.address,
     tornadoInstances,
     uniswapHandler.address
   );
@@ -152,7 +144,6 @@ module.exports = async function(deployer, network, accounts) {
   console.log("\nDeployment Summary:");
   console.log(`GhostPad: ${ghostPad.address}`);
   console.log(`TokenTemplate: ${tokenTemplate.address}`);
-  console.log(`MetadataVerifier: ${metadataVerifier.address}`);
   console.log(`UniswapHandler: ${uniswapHandler.address}`);
   console.log(`Governance: ${governance}`);
   console.log(`Governance Fee: ${await ghostPad.governanceFee()} basis points`);

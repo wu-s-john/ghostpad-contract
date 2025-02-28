@@ -3,11 +3,11 @@
 /* eslint-disable */
 import type {
   BaseContract,
-  BigNumberish,
   BytesLike,
   FunctionFragment,
   Result,
   Interface,
+  AddressLike,
   ContractRunner,
   ContractMethod,
   Listener,
@@ -20,25 +20,31 @@ import type {
   TypedContractMethod,
 } from "./common";
 
-export interface MetadataVerifierInterface extends Interface {
-  getFunction(nameOrSignature: "verifyProof"): FunctionFragment;
+export interface MockUniswapFactoryInterface extends Interface {
+  getFunction(
+    nameOrSignature: "createPair" | "getPair" | "mockPair"
+  ): FunctionFragment;
 
   encodeFunctionData(
-    functionFragment: "verifyProof",
-    values: [BytesLike, [BigNumberish, BigNumberish]]
+    functionFragment: "createPair",
+    values: [AddressLike, AddressLike]
   ): string;
+  encodeFunctionData(
+    functionFragment: "getPair",
+    values: [AddressLike, AddressLike]
+  ): string;
+  encodeFunctionData(functionFragment: "mockPair", values?: undefined): string;
 
-  decodeFunctionResult(
-    functionFragment: "verifyProof",
-    data: BytesLike
-  ): Result;
+  decodeFunctionResult(functionFragment: "createPair", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "getPair", data: BytesLike): Result;
+  decodeFunctionResult(functionFragment: "mockPair", data: BytesLike): Result;
 }
 
-export interface MetadataVerifier extends BaseContract {
-  connect(runner?: ContractRunner | null): MetadataVerifier;
+export interface MockUniswapFactory extends BaseContract {
+  connect(runner?: ContractRunner | null): MockUniswapFactory;
   waitForDeployment(): Promise<this>;
 
-  interface: MetadataVerifierInterface;
+  interface: MockUniswapFactoryInterface;
 
   queryFilter<TCEvent extends TypedContractEvent>(
     event: TCEvent,
@@ -77,23 +83,41 @@ export interface MetadataVerifier extends BaseContract {
     event?: TCEvent
   ): Promise<this>;
 
-  verifyProof: TypedContractMethod<
-    [proof: BytesLike, input: [BigNumberish, BigNumberish]],
-    [boolean],
+  createPair: TypedContractMethod<
+    [tokenA: AddressLike, tokenB: AddressLike],
+    [string],
+    "nonpayable"
+  >;
+
+  getPair: TypedContractMethod<
+    [arg0: AddressLike, arg1: AddressLike],
+    [string],
     "view"
   >;
+
+  mockPair: TypedContractMethod<[], [string], "view">;
 
   getFunction<T extends ContractMethod = ContractMethod>(
     key: string | FunctionFragment
   ): T;
 
   getFunction(
-    nameOrSignature: "verifyProof"
+    nameOrSignature: "createPair"
   ): TypedContractMethod<
-    [proof: BytesLike, input: [BigNumberish, BigNumberish]],
-    [boolean],
+    [tokenA: AddressLike, tokenB: AddressLike],
+    [string],
+    "nonpayable"
+  >;
+  getFunction(
+    nameOrSignature: "getPair"
+  ): TypedContractMethod<
+    [arg0: AddressLike, arg1: AddressLike],
+    [string],
     "view"
   >;
+  getFunction(
+    nameOrSignature: "mockPair"
+  ): TypedContractMethod<[], [string], "view">;
 
   filters: {};
 }

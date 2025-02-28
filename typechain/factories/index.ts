@@ -4,7 +4,12 @@
 export { GhostPad__factory } from "./GhostPad__factory";
 export { Hasher__factory } from "./Hasher__factory";
 export { MerkleTreeWithHistoryMock__factory } from "./MerkleTreeWithHistoryMock__factory";
-export { MetadataVerifier__factory } from "./MetadataVerifier__factory";
+export { MockERC20__factory } from "./MockERC20__factory";
+export { MockTornadoInstance__factory } from "./MockTornadoInstance__factory";
+export { MockUniswapFactory__factory } from "./MockUniswapFactory__factory";
+export { MockUniswapHandler__factory } from "./MockUniswapHandler__factory";
+export { MockUniswapPair__factory } from "./MockUniswapPair__factory";
+export { MockUniswapRouter__factory } from "./MockUniswapRouter__factory";
 export { TokenTemplate__factory } from "./TokenTemplate__factory";
 export { UniswapHandler__factory } from "./UniswapHandler__factory";
 export { Verifier__factory } from "./Verifier__factory";
