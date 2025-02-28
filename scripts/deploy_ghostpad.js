@@ -9,7 +9,9 @@ const Verifier = artifacts.require("Verifier");
 const Hasher = artifacts.require("Hasher"); 
 
 // For testing, use mock implementations
-const MockUniswapHandler = artifacts.require("MockUniswapHandler");
+const MockUniswapRouter = artifacts.require("MockUniswapRouter");
+const MockUniswapFactory = artifacts.require("MockUniswapFactory");
+const MockUniswapPair = artifacts.require("MockUniswapPair");
 
 // Example ERC20 token
 const MockERC20 = artifacts.require("MockERC20");
@@ -63,17 +65,28 @@ module.exports = async function(deployer, network, accounts) {
     console.log(`ETHTornado with ${web3.utils.fromWei(denomination)} ETH denomination deployed at: ${instance.address}`);
   }
   
-  // Deploy UniswapHandler or MockUniswapHandler based on network
+  // Deploy UniswapHandler with real or mock components based on network
   let uniswapHandler;
   
   if (network === 'development' || network === 'test') {
-    // For testing, deploy a mock UniswapHandler
-    console.log("Deploying MockUniswapHandler for testing...");
-    const mockRouterAddress = accounts[8]; // Use an account as mock router
-    const mockFactoryAddress = accounts[9]; // Use an account as mock factory
-    await deployer.deploy(MockUniswapHandler, mockRouterAddress, mockFactoryAddress);
-    uniswapHandler = await MockUniswapHandler.deployed();
-    console.log(`MockUniswapHandler deployed at: ${uniswapHandler.address}`);
+    // For testing, deploy mock Uniswap components and real UniswapHandler
+    console.log("Deploying mock Uniswap components for testing...");
+    
+    // Deploy mock factory with default mock pair
+    await deployer.deploy(MockUniswapFactory, "0x0000000000000000000000000000000000000000");
+    const mockFactory = await MockUniswapFactory.deployed();
+    console.log(`MockUniswapFactory deployed at: ${mockFactory.address}`);
+    
+    // Deploy mock router with mock factory
+    await deployer.deploy(MockUniswapRouter, mockFactory.address, accounts[9]); // Use account 9 as WETH
+    const mockRouter = await MockUniswapRouter.deployed();
+    console.log(`MockUniswapRouter deployed at: ${mockRouter.address}`);
+    
+    // Deploy real UniswapHandler with mock router
+    console.log("Deploying UniswapHandler with mock router...");
+    await deployer.deploy(UniswapHandler, mockRouter.address);
+    uniswapHandler = await UniswapHandler.deployed();
+    console.log(`UniswapHandler deployed at: ${uniswapHandler.address} with mock router ${mockRouter.address}`);
   } else {
     // For production networks, use actual Uniswap router addresses
     console.log("Deploying UniswapHandler...");

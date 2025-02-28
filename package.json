@@ -26,7 +26,7 @@
     "anvil": "anvil",
     "format": "forge fmt",
     "gas-report": "forge test --gas-report",
-    "typechain": "typechain --target ethers-v6 --out-dir typechain 'out/GhostPad.sol/GhostPad.json' 'out/TokenTemplate.sol/TokenTemplate.json' 'out/Tornado.sol/Tornado.json' 'out/UniswapHandler.sol/UniswapHandler.json' 'out/Hasher.sol/Hasher.json' 'out/Verifier.sol/Verifier.json' 'out/MerkleTreeWithHistoryMock.sol/MerkleTreeWithHistoryMock.json' 'out/MockERC20.sol/MockERC20.json' 'out/MockTornadoInstance.sol/MockTornadoInstance.json' 'out/MockUniswapFactory.sol/MockUniswapFactory.json' 'out/MockUniswapHandler.sol/MockUniswapHandler.json' 'out/MockUniswapPair.sol/MockUniswapPair.json' 'out/MockUniswapRouter.sol/MockUniswapRouter.json'",
+    "typechain": "typechain --target ethers-v6 --out-dir typechain 'out/GhostPad.sol/GhostPad.json' 'out/TokenTemplate.sol/TokenTemplate.json' 'out/Tornado.sol/Tornado.json' 'out/UniswapHandler.sol/UniswapHandler.json' 'out/Hasher.sol/Hasher.json' 'out/Verifier.sol/Verifier.json' 'out/MerkleTreeWithHistoryMock.sol/MerkleTreeWithHistoryMock.json' 'out/MockERC20.sol/MockERC20.json' 'out/MockTornadoInstance.sol/MockTornadoInstance.json' 'out/MockUniswapFactory.sol/MockUniswapFactory.json' 'out/MockUniswapPair.sol/MockUniswapPair.json' 'out/MockUniswapRouter.sol/MockUniswapRouter.json'",
     "setup-type-dirs": "node scripts/setup-type-dirs.js",
     "generate-all-types": "yarn setup-type-dirs && yarn typechain",
     "test:vitest:fresh": "chmod +x scripts/reset-anvil.sh && ./scripts/reset-anvil.sh && NODE_OPTIONS=--experimental-vm-modules vitest run",

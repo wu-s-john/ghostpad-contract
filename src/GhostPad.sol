@@ -270,8 +270,8 @@ contract GhostPad is Ownable {
         uint256 tokenAmount = IERC20(tokenAddress).balanceOf(address(this));
         
         if (tokenAmount > 0 && liquidityEthAmount > 0) {
-            // Approve tokens for the Uniswap handler
-            IERC20(tokenAddress).approve(uniswapHandler, tokenAmount);
+            // First transfer tokens to the UniswapHandler
+            IERC20(tokenAddress).transfer(uniswapHandler, tokenAmount);
             
             // Create liquidity pool
             UniswapHandler uniswapHandlerContract = UniswapHandler(payable(uniswapHandler));

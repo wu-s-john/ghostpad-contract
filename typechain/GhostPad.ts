@@ -31,7 +31,6 @@ export declare namespace GhostPad {
     description: string;
     burnEnabled: boolean;
     liquidityLockPeriod: BigNumberish;
-    liquidityTokenAmount: BigNumberish;
     useProtocolFee: boolean;
     vestingEnabled: boolean;
   };
@@ -43,7 +42,6 @@ export declare namespace GhostPad {
     description: string,
     burnEnabled: boolean,
     liquidityLockPeriod: bigint,
-    liquidityTokenAmount: bigint,
     useProtocolFee: boolean,
     vestingEnabled: boolean
   ] & {
@@ -53,7 +51,6 @@ export declare namespace GhostPad {
     description: string;
     burnEnabled: boolean;
     liquidityLockPeriod: bigint;
-    liquidityTokenAmount: bigint;
     useProtocolFee: boolean;
     vestingEnabled: boolean;
   };

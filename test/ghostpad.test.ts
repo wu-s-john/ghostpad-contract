@@ -11,7 +11,6 @@ import {
   Hasher__factory,
   MockTornadoInstance__factory,
   MockUniswapFactory__factory,
-  MockUniswapHandler__factory,
   MockUniswapPair__factory,
   MockUniswapRouter__factory,
   TokenTemplate,
@@ -20,7 +19,6 @@ import {
   Hasher,
   MockTornadoInstance,
   MockUniswapFactory,
-  MockUniswapHandler,
   MockUniswapPair,
   MockUniswapRouter,
   UniswapHandler

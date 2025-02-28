@@ -119,7 +119,67 @@ contract UniswapHandler is Ownable {
     }
     
     /**
+     * @dev Determines the effective lock period for a token
+     * @param tokenAddress The token address
+     * @param providedLockPeriod The lock period provided in the function call
+     * @return The effective lock period to use
+     */
+    function _getEffectiveLockPeriod(address tokenAddress, uint256 providedLockPeriod) internal view returns (uint256) {
+        // If provided lock period is greater than 0, use it
+        if (providedLockPeriod > 0) {
+            return providedLockPeriod;
+        }
+        
+        // Otherwise try to get it from the token
+        try TokenTemplate(payable(tokenAddress)).liquidityLockPeriod() returns (uint256 tokenLockPeriod) {
+            return tokenLockPeriod;
+        } catch {
+            return 0;
+        }
+    }
+    
+    /**
+     * @dev Updates the liquidity info and handles locking if needed
+     * @param tokenAddress The token address
+     * @param pairAddress The pair address
+     * @param lockPeriod The lock period
+     * @param amountToken The amount of tokens added to liquidity
+     * @param amountETH The amount of ETH added to liquidity
+     * @param lpTokens The amount of LP tokens received
+     */
+    function _updateLiquidityInfo(
+        address tokenAddress,
+        address pairAddress,
+        uint256 lockPeriod,
+        uint256 amountToken,
+        uint256 amountETH,
+        uint256 lpTokens
+    ) internal {
+        uint256 unlockTime = lockPeriod > 0 ? block.timestamp.add(lockPeriod) : 0;
+        
+        // Update liquidity info
+        liquidityInfo[tokenAddress] = LiquidityInfo({
+            pair: pairAddress,
+            isLocked: lockPeriod > 0,
+            unlockTime: unlockTime
+        });
+        
+        // If token is a TokenTemplate and lockPeriod > 0, lock liquidity in the token contract
+        if (lockPeriod > 0) {
+            try TokenTemplate(payable(tokenAddress)).lockLiquidity(pairAddress) {
+                emit LiquidityLocked(tokenAddress, pairAddress, lockPeriod, unlockTime);
+            } catch {
+                // If the token doesn't have the lockLiquidity function, it's fine
+                // The LP tokens are still locked in this contract
+            }
+        }
+        
+        emit LiquidityAdded(tokenAddress, pairAddress, amountToken, amountETH, lpTokens);
+    }
+    
+    /**
      * @dev Add liquidity to a token/ETH pair
+     * Only callable by contract addresses, not EOAs (externally owned accounts)
      * @param tokenAddress The address of the token
      * @param tokenAmount The amount of tokens to add to the liquidity pool
      * @param ethAmount The amount of ETH to add to the liquidity pool
@@ -136,21 +196,27 @@ contract UniswapHandler is Ownable {
         require(tokenAmount > 0, "Token amount must be greater than 0");
         require(msg.value == ethAmount, "Sent ETH must match ethAmount");
         
+        // Ensure caller is a contract, not an EOA
+        uint256 size;
+        assembly {
+            size := extcodesize(caller())
+        }
+        require(size > 0, "Only contracts can call this function");
+        
         // Create or get the pair
         address pairAddress = createPair(tokenAddress);
-
-        // First reset the allowance to 0
-        IERC20(tokenAddress).safeApprove(uniswapRouterAddress, 0);
         
-        // Transfer tokens from sender to this contract
-        IERC20(tokenAddress).safeTransferFrom(msg.sender, address(this), tokenAmount);
+        // Verify that the token balance of this contract is sufficient
+        uint256 contractTokenBalance = IERC20(tokenAddress).balanceOf(address(this));
+        require(contractTokenBalance >= tokenAmount, "Insufficient token balance in contract");
         
-        // Now set the allowance to the token amount
+        // Approve router to spend tokens
         IERC20(tokenAddress).safeApprove(uniswapRouterAddress, tokenAmount);
         
         // Add liquidity
         IUniswapV2Router02 router = IUniswapV2Router02(uniswapRouterAddress);
         
+        // Call addLiquidityETH and store results
         (uint256 amountToken, uint256 amountETH, uint256 lpTokens) = router.addLiquidityETH{value: ethAmount}(
             tokenAddress,
             tokenAmount,
@@ -170,24 +236,18 @@ contract UniswapHandler is Ownable {
             payable(msg.sender).transfer(ethAmount.sub(amountETH));
         }
         
-        // Update liquidity info
-        liquidityInfo[tokenAddress] = LiquidityInfo({
-            pair: pairAddress,
-            isLocked: lockPeriod > 0,
-            unlockTime: lockPeriod > 0 ? block.timestamp.add(lockPeriod) : 0
-        });
+        // Get the effective lock period (from token if needed)
+        uint256 effectiveLockPeriod = _getEffectiveLockPeriod(tokenAddress, lockPeriod);
         
-        // If token is a TokenTemplate and lockPeriod > 0, lock liquidity in the token contract
-        if (lockPeriod > 0) {
-            try TokenTemplate(payable(tokenAddress)).lockLiquidity(pairAddress) {
-                emit LiquidityLocked(tokenAddress, pairAddress, lockPeriod, liquidityInfo[tokenAddress].unlockTime);
-            } catch {
-                // If the token doesn't have the lockLiquidity function, it's fine
-                // The LP tokens are still locked in this contract
-            }
-        }
-        
-        emit LiquidityAdded(tokenAddress, pairAddress, amountToken, amountETH, lpTokens);
+        // Update liquidity info and handle locking
+        _updateLiquidityInfo(
+            tokenAddress,
+            pairAddress,
+            effectiveLockPeriod,
+            amountToken,
+            amountETH,
+            lpTokens
+        );
         
         return lpTokens;
     }
