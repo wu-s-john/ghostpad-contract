@@ -31,6 +31,21 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
     
     // Vesting settings
     bool public vestingEnabled; // Whether vesting functionality is enabled
+    
+    // Initialization parameters struct to avoid too many arguments
+    struct InitParams {
+        string name;
+        string symbol;
+        uint256 initialSupply;
+        address owner;
+        address contractAddress;
+        string description;
+        bool burnEnabled;
+        uint256 liquidityLockPeriod;
+        bool vestingEnabled;
+        uint256 ethAmount;
+    }
+    
     struct VestingSchedule {
         address beneficiary; // Beneficiary of tokens after they are released
         uint256 cliff;      // Cliff time - when tokens start to vest
@@ -86,31 +101,15 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
     
     /**
      * @dev Initialize the token (can only be called once)
-     * @param name Token name
-     * @param symbol Token symbol
-     * @param initialSupply Initial supply of tokens
-     * @param owner Owner of the token
-     * @param _description Description of the token
-     * @param _burnEnabled Whether burn is enabled
-     * @param _liquidityLockPeriod Period for locking liquidity
-     * @param _vestingEnabled Whether vesting functionality is enabled
-     * @param _ethAmount ETH amount used to calculate owner percentage
+     * @param params Initialization parameters struct
      */
     function initialize(
-        string memory name,
-        string memory symbol,
-        uint256 initialSupply,
-        address owner,
-        string memory _description,
-        bool _burnEnabled,
-        uint256 _liquidityLockPeriod,
-        bool _vestingEnabled,
-        uint256 _ethAmount
+        InitParams memory params
     ) external initializer {
-        require(owner != address(0), "Owner cannot be the zero address");
+        require(params.owner != address(0), "Owner cannot be the zero address");
         
         // Initialize base contracts
-        __ERC20_init(name, symbol);
+        __ERC20_init(params.name, params.symbol);
         __Ownable_init();
         __ReentrancyGuard_init();
         
@@ -119,36 +118,36 @@ contract TokenTemplate is Initializable, ERC20Upgradeable, OwnableUpgradeable, R
         
         // Calculate the owner percentage based on ETH amount
         uint256 ownerPercentage;
-        if (_ethAmount > 0) {
+        if (params.ethAmount > 0) {
             // Calculate percentage using the formula
-            ownerPercentage = calculateOwnerPercentage(_ethAmount);
+            ownerPercentage = calculateOwnerPercentage(params.ethAmount);
         } else {
             // Default to 50% if no ETH amount is provided
             ownerPercentage = 5000;
         }
         
         // Calculate token amounts for owner and contract
-        uint256 ownerAmount = initialSupply.mul(ownerPercentage).div(10000);
-        uint256 contractAmount = initialSupply.sub(ownerAmount);
+        uint256 ownerAmount = params.initialSupply.mul(ownerPercentage).div(10000);
+        uint256 contractAmount = params.initialSupply.sub(ownerAmount);
         
         // Mint tokens with the correct distribution
-        _mint(owner, ownerAmount);
-        _mint(address(this), contractAmount);
+        _mint(params.owner, ownerAmount);
+        _mint(params.contractAddress, contractAmount);
         
         // Emit token distribution event
         emit TokenDistribution(ownerAmount, contractAmount, ownerPercentage);
         
         // Set owner
-        transferOwnership(owner);
+        transferOwnership(params.owner);
         
         // Set token properties
-        description = _description;
-        burnEnabled = _burnEnabled;
-        liquidityLockPeriod = _liquidityLockPeriod;
-        vestingEnabled = _vestingEnabled;
+        description = params.description;
+        burnEnabled = params.burnEnabled;
+        liquidityLockPeriod = params.liquidityLockPeriod;
+        vestingEnabled = params.vestingEnabled;
         contractLocked = false;
         
-        emit Initialized(name, symbol, initialSupply, owner);
+        emit Initialized(params.name, params.symbol, params.initialSupply, params.owner);
     }
     
     /**

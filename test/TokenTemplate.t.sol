@@ -35,18 +35,21 @@ contract TokenTemplateTest is Test {
     function testInitialization() public {
         vm.startPrank(deployer);
         
-        // Initialize the token with 0 ETH amount (default 50% distribution)
-        tokenTemplate.initialize(
-            name,
-            symbol,
-            initialSupply,
-            owner,
-            description,
-            burnEnabled,
-            liquidityLockPeriod,
-            vestingEnabled,
-            0 // ethAmount = 0, should default to 50% for owner
-        );
+        // Initialize the token with struct
+        TokenTemplate.InitParams memory params = TokenTemplate.InitParams({
+            name: name,
+            symbol: symbol,
+            initialSupply: initialSupply,
+            owner: owner,
+            contractAddress: deployer,
+            description: description,
+            burnEnabled: burnEnabled,
+            liquidityLockPeriod: liquidityLockPeriod,
+            vestingEnabled: vestingEnabled,
+            ethAmount: 0 // ethAmount = 0, should default to 50% for owner
+        });
+        
+        tokenTemplate.initialize(params);
         
         vm.stopPrank();
         
@@ -66,7 +69,7 @@ contract TokenTemplateTest is Test {
         uint256 contractAmount = initialSupply - ownerAmount;
         
         assertEq(tokenTemplate.balanceOf(owner), ownerAmount);
-        assertEq(tokenTemplate.balanceOf(address(tokenTemplate)), contractAmount);
+        assertEq(tokenTemplate.balanceOf(deployer), contractAmount);
         assertEq(tokenTemplate.totalSupply(), initialSupply);
     }
 
@@ -74,17 +77,20 @@ contract TokenTemplateTest is Test {
         vm.startPrank(deployer);
         
         // Initialize the token with 1 ETH amount
-        tokenTemplate.initialize(
-            name,
-            symbol,
-            initialSupply,
-            owner,
-            description,
-            burnEnabled,
-            liquidityLockPeriod,
-            vestingEnabled,
-            1 ether // Pass 1 ETH amount directly
-        );
+        TokenTemplate.InitParams memory params = TokenTemplate.InitParams({
+            name: name,
+            symbol: symbol,
+            initialSupply: initialSupply,
+            owner: owner,
+            contractAddress: deployer,
+            description: description,
+            burnEnabled: burnEnabled,
+            liquidityLockPeriod: liquidityLockPeriod,
+            vestingEnabled: vestingEnabled,
+            ethAmount: 1 ether // Pass 1 ETH amount directly
+        });
+        
+        tokenTemplate.initialize(params);
         
         vm.stopPrank();
         
@@ -102,23 +108,26 @@ contract TokenTemplateTest is Test {
         
         // Verify the token distribution
         assertEq(tokenTemplate.balanceOf(owner), ownerAmount);
-        assertEq(tokenTemplate.balanceOf(address(tokenTemplate)), contractAmount);
+        assertEq(tokenTemplate.balanceOf(deployer), contractAmount);
     }
     
     function testTransfer() public {
         // Initialize the token first
         vm.prank(deployer);
-        tokenTemplate.initialize(
-            name,
-            symbol,
-            initialSupply,
-            owner,
-            description,
-            burnEnabled,
-            liquidityLockPeriod,
-            vestingEnabled,
-            0 // Default distribution
-        );
+        TokenTemplate.InitParams memory params = TokenTemplate.InitParams({
+            name: name,
+            symbol: symbol,
+            initialSupply: initialSupply,
+            owner: owner,
+            contractAddress: deployer,
+            description: description,
+            burnEnabled: burnEnabled,
+            liquidityLockPeriod: liquidityLockPeriod,
+            vestingEnabled: vestingEnabled,
+            ethAmount: 0 // Default distribution
+        });
+        
+        tokenTemplate.initialize(params);
         
         // Check initial balances
         uint256 ownerPercentage = 5000; // Default 50%
@@ -145,17 +154,20 @@ contract TokenTemplateTest is Test {
     function testTransferFrom() public {
         // Initialize the token first
         vm.prank(deployer);
-        tokenTemplate.initialize(
-            name,
-            symbol,
-            initialSupply,
-            owner,
-            description,
-            burnEnabled,
-            liquidityLockPeriod,
-            vestingEnabled,
-            0 // Default distribution
-        );
+        TokenTemplate.InitParams memory params = TokenTemplate.InitParams({
+            name: name,
+            symbol: symbol,
+            initialSupply: initialSupply,
+            owner: owner,
+            contractAddress: deployer,
+            description: description,
+            burnEnabled: burnEnabled,
+            liquidityLockPeriod: liquidityLockPeriod,
+            vestingEnabled: vestingEnabled,
+            ethAmount: 0 // Default distribution
+        });
+        
+        tokenTemplate.initialize(params);
         
         // Check initial balances
         uint256 ownerPercentage = 5000; // Default 50%
@@ -218,17 +230,20 @@ contract TokenTemplateTest is Test {
     function testMultipleTransfers() public {
         // Initialize the token
         vm.prank(deployer);
-        tokenTemplate.initialize(
-            name,
-            symbol,
-            initialSupply,
-            owner,
-            description,
-            burnEnabled,
-            liquidityLockPeriod,
-            vestingEnabled,
-            0 // Default distribution
-        );
+        TokenTemplate.InitParams memory params = TokenTemplate.InitParams({
+            name: name,
+            symbol: symbol,
+            initialSupply: initialSupply,
+            owner: owner,
+            contractAddress: deployer,
+            description: description,
+            burnEnabled: burnEnabled,
+            liquidityLockPeriod: liquidityLockPeriod,
+            vestingEnabled: vestingEnabled,
+            ethAmount: 0 // Default distribution
+        });
+        
+        tokenTemplate.initialize(params);
         
         // Check initial balances
         uint256 ownerPercentage = 5000; // Default 50%

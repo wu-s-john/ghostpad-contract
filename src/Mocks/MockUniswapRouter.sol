@@ -14,6 +14,9 @@ contract MockUniswapRouter {
     mapping(address => uint256) public tokenReserves;
     uint256 public ethReserves = 10 ether;
     
+    // Add this state variable to track token balances for each token
+    mapping(address => uint256) public tokenBalances;
+    
     // Helper function to set token reserves for testing
     function setTokenReserves(address token, uint256 amount) public {
         tokenReserves[token] = amount;
@@ -38,15 +41,22 @@ contract MockUniswapRouter {
         address to,
         uint256 deadline
     ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity) {
-        // Just return the input amounts and some fake liquidity
-        // Update the token reserves when adding liquidity
-        tokenReserves[token] = amountTokenDesired;
-        ethReserves = msg.value;
+        // Record that we now have tokens available for swapping
+        // Let's keep half the tokens for swapping and put half in the pair
+        uint256 tokensForSwap = amountTokenDesired / 2;
+        uint256 tokensForLiquidity = amountTokenDesired - tokensForSwap;
         
+        // Transfer tokens to ourselves for later swaps
+        IERC20(token).transferFrom(msg.sender, address(this), amountTokenDesired);
+        
+        // Store token balance for swaps
+        tokenBalances[token] += tokensForSwap;
+        
+        // Return values mimicking real Uniswap behavior
         return (amountTokenDesired, msg.value, 1000000);
     }
     
-    // Update swapExactETHForTokens to handle tokens correctly
+    // Modify the swapExactETHForTokens function to use our stored token balance
     function swapExactETHForTokens(
         uint256 amountOutMin,
         address[] calldata path,
@@ -60,11 +70,13 @@ contract MockUniswapRouter {
         address token = path[1];
         uint256 tokenAmount = calculateSwapAmount(msg.value, token);
         
-        // Update reserves
-        ethReserves += msg.value;
+        // Check if we have enough tokens
+        require(tokenBalances[token] >= tokenAmount, "Not enough tokens for swap");
         
-        // Actually transfer tokens to the buyer - this is what was missing!
-        // We simulate this by transferring tokens from the reserves
+        // Reduce our token balance
+        tokenBalances[token] -= tokenAmount;
+        
+        // Transfer tokens to the buyer
         bool success = IERC20(token).transfer(to, tokenAmount);
         require(success, "Token transfer failed");
         

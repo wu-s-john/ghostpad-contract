@@ -24,18 +24,21 @@ import "./TokenTemplate.sol";
 import "./UniswapHandler.sol";
 
 interface ITokenTemplate {
-    function initialize(
-        string memory name,
-        string memory symbol,
-        uint256 initialSupply,
-        address owner,
-        string memory description,
-        bool burnEnabled,
-        uint256 liquidityLockPeriod,
-        bool vestingEnabled,
-        uint256 ethAmount
-    ) external;
+    // Make sure this matches exactly with TokenTemplate.InitParams
+    struct InitParams {
+        string name;
+        string symbol;
+        uint256 initialSupply;
+        address owner;
+        address contractAddress;
+        string description;
+        bool burnEnabled;
+        uint256 liquidityLockPeriod;
+        bool vestingEnabled;
+        uint256 ethAmount;
+    }
 
+    function initialize(InitParams memory params) external;
     function calculateOwnerPercentage(uint256 ethAmount) external pure returns (uint256);
 }
 
@@ -199,18 +202,22 @@ contract GhostPad is Ownable {
         TornadoInstanceInfo memory instanceInfo = tornadoInstances[proofData.instanceIndex];
         uint256 ethAmount = instanceInfo.denomination;
         
-        // Initialize the token without tax parameters
-        token.initialize(
-            tokenData.name,
-            tokenData.symbol,
-            tokenData.initialSupply,
-            proofData.recipient,
-            tokenData.description,
-            tokenData.burnEnabled,
-            tokenData.liquidityLockPeriod,
-            tokenData.vestingEnabled,
-            ethAmount // Pass the ETH amount from the tornado instance
-        );
+        // Create params using the TokenTemplate's struct type directly
+        TokenTemplate.InitParams memory params = TokenTemplate.InitParams({
+            name: tokenData.name,
+            symbol: tokenData.symbol,
+            initialSupply: tokenData.initialSupply,
+            owner: tokenData.owner,
+            contractAddress: address(this),
+            description: tokenData.description,
+            burnEnabled: tokenData.burnEnabled,
+            liquidityLockPeriod: tokenData.liquidityLockPeriod,
+            vestingEnabled: tokenData.vestingEnabled,
+            ethAmount: ethAmount
+        });
+        
+        // Initialize with the correctly typed struct
+        token.initialize(params);
         
         // Transfer fee if applicable
         if (fee > 0) {
@@ -234,8 +241,6 @@ contract GhostPad is Ownable {
         
         // Make sure the recipient is this contract so it receives the ETH from Tornado
         proofData.recipient = payable(address(this));
-        // Add an assertion to ensure recipient is correctly set
-        require(proofData.recipient == payable(address(this)), "Recipient must be this contract");
         
         // Get the instance information to know the ETH amount
         TornadoInstanceInfo memory instanceInfo = tornadoInstances[proofData.instanceIndex];
@@ -386,6 +391,7 @@ contract GhostPad is Ownable {
         string symbol;
         uint256 initialSupply;
         string description;
+        address payable owner;
         bool burnEnabled;
         uint256 liquidityLockPeriod;
         bool useProtocolFee;

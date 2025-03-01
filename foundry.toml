@@ -17,4 +17,6 @@ remappings = [
 # Show more info during tests, particularly for troubleshooting
 verbosity = 3
 
+allowed_paths = ["./", "./scripts", "./src", "./test", "./deployments"]
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

@@ -18,7 +18,7 @@
     "compile": "forge build && yarn generate-all-types",
     "run": "node scripts/run.js",
     "deploy": "forge script",
-    "deploy:dev": "forge script script/DeployDev.s.sol:DeployDevScript --sig \"run(address)\" --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --private-key ${PRIVATE_KEY} --broadcast -- ${GOVERNANCE_ADDRESS:-0x0000000000000000000000000000000000000000}",
+    "deploy:dev": "forge script script/DeployDev.s.sol:DeployDevScript --sig \"run(address)\" --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --private-key ${PRIVATE_KEY} --broadcast -- ${GOVERNANCE_ADDRESS:-0x0000000000000000000000000000000000000000} --ffi",
     "deploy:prod": "forge script script/DeployProd.s.sol:DeployProdScript --sig \"run(address,address,address[])\" --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --private-key ${PRIVATE_KEY} --broadcast -- ${UNISWAP_ROUTER} ${GOVERNANCE_ADDRESS} ${TORNADO_INSTANCES}",
     "deploy:dev:verify": "forge script script/DeployDev.s.sol:DeployDevScript --sig \"run(address)\" --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --private-key ${PRIVATE_KEY} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY} -- ${GOVERNANCE_ADDRESS:-0x0000000000000000000000000000000000000000}",
     "deploy:prod:verify": "forge script script/DeployProd.s.sol:DeployProdScript --sig \"run(address,address,address[])\" --rpc-url ${RPC_URL:-http://127.0.0.1:8545} --private-key ${PRIVATE_KEY} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY} -- ${UNISWAP_ROUTER} ${GOVERNANCE_ADDRESS} ${TORNADO_INSTANCES}",
@@ -30,7 +30,8 @@
     "setup-type-dirs": "node scripts/setup-type-dirs.js",
     "generate-all-types": "yarn setup-type-dirs && yarn typechain",
     "test:vitest:fresh": "chmod +x scripts/reset-anvil.sh && ./scripts/reset-anvil.sh && NODE_OPTIONS=--experimental-vm-modules vitest run",
-    "test:vitest:reset": "chmod +x scripts/reset-anvil.sh && ./scripts/reset-anvil.sh && NODE_OPTIONS=--experimental-vm-modules vitest"
+    "test:vitest:reset": "chmod +x scripts/reset-anvil.sh && ./scripts/reset-anvil.sh && NODE_OPTIONS=--experimental-vm-modules vitest",
+    "anvil:fund": "node scripts/fund-wallet.js"
   },
   "keywords": [
     "ethereum",

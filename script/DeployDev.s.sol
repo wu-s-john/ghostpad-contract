@@ -2,6 +2,7 @@
 pragma solidity 0.7.6;
 
 import "forge-std/Script.sol";
+import "forge-std/StdJson.sol"; // Add StdJson import
 import "../src/GhostPad.sol";
 import "../src/TokenTemplate.sol";
 import "../src/UniswapHandler.sol";
@@ -13,6 +14,8 @@ import "../src/mocks/MockUniswapPair.sol";
 
 // Development deployment script - automatically deploys all mock contracts
 contract DeployDevScript is Script {
+    using stdJson for string;
+    
     function setUp() public {}
 
     function run(address payable governanceAddress) public {
@@ -88,13 +91,41 @@ contract DeployDevScript is Script {
         
         console.log("--- Mock Tornado Instances ---");
         for (uint256 i = 0; i < 4; i++) {
-            console.log(string(abi.encodePacked("Instance ", uint8(i+1), " (", uint2str(denominations[i] / 1e18), " ETH):")), tornadoInstances[i]);
+            console.log(string(abi.encodePacked("Tornado_cash_", uint8(i+1), " (", uint2str(denominations[i] / 1e18), " ETH):")), tornadoInstances[i]);
         }
         
         console.log("GhostPad:", address(ghostPad));
         console.log("Governance:", governanceAddress);
         console.log("Governance Fee: 3%");
         console.log("=========================================");
+
+        // Create JSON with contract addresses
+        string memory contractsJson = "";
+        contractsJson = stdJson.serialize("contracts", "tokenTemplate", address(tokenTemplate));
+        contractsJson = stdJson.serialize("contracts", "verifier", address(verifier));
+        contractsJson = stdJson.serialize("contracts", "mockUniswapFactory", address(mockFactory));
+        contractsJson = stdJson.serialize("contracts", "mockUniswapPair", address(mockPair));
+        contractsJson = stdJson.serialize("contracts", "mockUniswapRouter", address(mockRouter));
+        contractsJson = stdJson.serialize("contracts", "uniswapHandler", address(uniswapHandler));
+        contractsJson = stdJson.serialize("contracts", "ghostPad", address(ghostPad));
+        contractsJson = stdJson.serialize("contracts", "governance", governanceAddress);
+        
+        // Add tornado instances to JSON
+        string memory instancesJson = "";
+        for (uint256 i = 0; i < 4; i++) {
+            string memory key = string(abi.encodePacked("tornadoInstance", uint2str(denominations[i] / 1e18), "ETH"));
+            instancesJson = stdJson.serialize("tornadoInstances", key, tornadoInstances[i]);
+        }
+        
+        // Combine and write JSON to file
+        string memory jsonOutput = stdJson.serialize("deployment", "contracts", contractsJson);
+        jsonOutput = stdJson.serialize("deployment", "tornadoInstances", instancesJson);
+        
+        // Write the JSON to a file
+        console.log(jsonOutput);
+        
+        // vm.writeJson(jsonOutput, "./deployments/dev.json");
+        // console.log("Deployment addresses written to ./deployments/dev.json");
 
         vm.stopBroadcast();
     }
@@ -121,4 +152,4 @@ contract DeployDevScript is Script {
         }
         return string(bstr);
     }
-} 
+}
